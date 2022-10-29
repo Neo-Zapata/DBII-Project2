@@ -1,27 +1,17 @@
-from collections import defaultdict
 import json
 import linecache as lc
-from lib2to3.pgen2.token import NUMBER
 from operator import index
 import os
 import io
 import sys
 from queue import PriorityQueue
-from curses import termattrs
-from tarfile import BLOCKSIZE
-from threading import local
 import nltk
 try:
 	nltk.data.find('tokenizers/punkt')
 except:
-	nltk.download('punkt') # u only need to download one time
-import numpy as np
+	nltk.download('punkt')
 from nltk.stem.snowball import SnowballStemmer
 import math
-import re
-import pandas as pd
-import random
-from matplotlib import pyplot as plt
 
 cwd = os.getcwd() # get the current working directory
 
@@ -39,6 +29,7 @@ inv_ind_path        = cwd + "/documents/inverted_index/" + inv_ind_filename
 path_to_clean_1     = cwd + "/documents/norm_doc"
 path_to_clean_2     = cwd + "/documents/inverted_index"
 path_to_clean_3     = cwd + "/documents/final_inverted_index"
+data_folder_path    = cwd + "/documents/data/"
 datafile_size       = os.path.getsize(data_path)
 
 class UBetterFixEverything():
@@ -49,11 +40,47 @@ class UBetterFixEverything():
 
     def __init__(self):
         self.clean_directories()
-        print("El dataset pesa: " + str(round(datafile_size/1048576,3)) + " MB") # MB
+        dataset_size = round(datafile_size/1048576,3)
+        print("El dataset pesa: " + str(dataset_size) + " MB") # MB
+        # if dataset_size > 1000: # more than a GB
+        #     pass
+        #     # print("El archivo es pesado, se realiza slicing para generar otros archivos con menor tamaño.")
+        #     # number_slices, new_slices_size = self.data_slicing()
+        #     # print("se crearon " + str(number_slices) + " archivos, con un tamaño aproximado de " + str(new_slices_size) + " MB cada uno.")
+        # else:
+        #     new_slices_size = dataset_size
         aprox_bloques_por_crear, aprox_block_size = self.approximation(datafile_size)
         print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
         self.BLOCK_SIZE = self.MB_to_B(aprox_block_size/100) 
         print("Actual block_size is: " + str(round(self.BLOCK_SIZE/1048576,3)) + " MB")
+
+#     def data_slicing(self):
+#         number_slices = 0
+#         new_slices_size = 0
+# #you need to add you path here
+#         with open(data_path , 'r', encoding='utf-8') as f1:
+#             ll = [json.loads(line.strip()) for line in f1.readlines()]
+
+#             #this is the total length size of the json file
+#             print(len(ll))
+
+#             #in here 2000 means we getting splits of 2000 tweets
+#             #you can define your own size of split according to your need
+#             size_of_the_split = 2000
+#             total = len(ll) // size_of_the_split
+
+#             #in here you will get the Number of splits
+#             number_slices = total + 1
+#             print(number_slices)
+
+#             for i in range(number_slices):
+#                 json.dump(ll[i * size_of_the_split:(i + 1) * size_of_the_split], open(data_folder_path + "data_split" + str(i+1) + ".json", 'w',encoding='utf8'), ensure_ascii=False, indent=True)
+#                 print("archivo " + str(i) + " creado")
+
+#             os.remove(data_path)
+
+#             new_slices_size = os.path.getsize(data_folder_path + "data_split1.json")
+#         return number_slices, new_slices_size
 
     def approximation(self, datafile_size):
         aprox_bloques_por_crear = math.log(datafile_size, 2)
@@ -303,11 +330,9 @@ class UBetterFixEverything():
 
 
 
-    def load(self):
-        # DEFINE_BLOCK_SIZE() # 200 MB by default
-        # BLOCK_SIZE = MB_to_B()
+    def load(self, MAX = 5000):
     # clean the files (or delete the directory) from previous iterations
-        self.clean_directories()
+        # self.clean_directories()
 
         local_inverted_index = {}
         documents_frequencies_list = []
@@ -332,10 +357,10 @@ class UBetterFixEverything():
 
     # insert into documents_frequencies_list, we do this to avoid accessing to disk each time a document is read, instead we send a block of frequency documents
                     document_frequency = self.process_document_frequency(document_frequency, doc_id)
-                    documents_frequencies_list.append(document_frequency)
-                    if self.get_size(documents_frequencies_list) >= self.BLOCK_SIZE:
-                        for document_frequency in documents_frequencies_list:
-                            self.upload_document_frequency_to_disk(document_frequency)  
+                    # documents_frequencies_list.append(document_frequency)
+                    # if self.get_size(documents_frequencies_list) >= self.BLOCK_SIZE:
+                    #     for document_frequency in documents_frequencies_list:
+                    self.upload_document_frequency_to_disk(document_frequency)  
 
     # checking local_inverted_index size, if it exceeds the block size, we store it into an auxiliar file, else, we continue
     # we avoid doing the cheking after every word insertion to avoid a lot of computation and to handle the 'leftovers' from a document (the id's)
@@ -344,10 +369,10 @@ class UBetterFixEverything():
                     self.NUMBER_OF_DOCUMENTS = self.NUMBER_OF_DOCUMENTS + 1
                     # print("documents read: " + str(self.NUMBER_OF_DOCUMENTS))
 
-                    print(self.NUMBER_OF_DOCUMENTS)
+                    # print(self.NUMBER_OF_DOCUMENTS)
 
                     # STOPPER: JUST FOR TESTING
-                    if self.NUMBER_OF_DOCUMENTS >= 5000:
+                    if self.NUMBER_OF_DOCUMENTS >= MAX:
                         break
 
             f.close()
@@ -383,15 +408,17 @@ class UBetterFixEverything():
 
 
     def score(self, query):
-        pass # TODO
+        if self.NUMBER_OF_DOCUMENTS == 0:
+            print("No documents were found. (0 documents loaded)")
+            return 0
 
 
 
 def main():
     instance = UBetterFixEverything()
-    # instance.load() 
-    query = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
-    instance.score(query)
+    instance.load(1000) 
+    # query = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
+    # instance.score(query)
 
 main()
 
