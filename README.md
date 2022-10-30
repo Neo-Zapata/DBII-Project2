@@ -8,8 +8,12 @@
 ## Objetivo:
 >TODO
 
+
 ## Métodos
+>TODO
+>
 ## Inverted index
+>TODO
 
 ## **Tabla de contenido**
 * [Dataset](#dataset)
