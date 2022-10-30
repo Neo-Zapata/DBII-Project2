@@ -2,9 +2,9 @@
 
 ## **Integrantes**
 * Neo Marcelo Zapata Gallegos
-* ...
-* ...
-* ...
+* Harold Canto Vidal
+* Christian Rojas Rojas
+* Eros 
 
 ## **Tabla de contenido**
 * [Dataset](#dataset)
