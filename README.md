@@ -5,6 +5,11 @@
 * Harold Canto Vidal
 * Christian Rojas Rojas
 * Eros 
+## Objetivo:
+>TODO
+
+## Métodos
+## Inverted index
 
 ## **Tabla de contenido**
 * [Dataset](#dataset)
