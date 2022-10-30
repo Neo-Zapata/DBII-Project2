@@ -3,6 +3,7 @@ import linecache as lc
 from operator import index
 import os
 import io
+from re import A
 import sys
 from queue import PriorityQueue
 import nltk
@@ -24,7 +25,7 @@ final_inv_ind_filename  = "final_inv_ind.json"
 stoplist_path       = os.path.join(cwd + "/stoplist/"                       , stoplist_filename)
 data_path           = os.path.join(cwd + "/documents/data/"                 , data_filename)
 norm_doc_path       = os.path.join(cwd + "/documents/norm_doc/"             , norm_doc_filename)
-final_inv_ind_path  = os.path.join(cwd + "/documents/final_inverted_index"  , final_inv_ind_filename)
+final_inv_ind_path  = os.path.join(cwd + "/documents/final_inverted_index/"  , final_inv_ind_filename)
 inv_ind_path        = cwd + "/documents/inverted_index/" + inv_ind_filename
 path_to_clean_1     = cwd + "/documents/norm_doc"
 path_to_clean_2     = cwd + "/documents/inverted_index"
@@ -37,59 +38,50 @@ class UBetterFixEverything():
     NUMBER_OF_DOCUMENTS = 0
     AUX_FILE_NUMBER = 1
     BLOCK_SIZE = 0 # bytes
+    MAX_DOCUMENTS_DEFAULT = 1000
 
     def __init__(self):
         self.clean_directories()
-        dataset_size = round(datafile_size/1048576,3)
-        print("El dataset pesa: " + str(dataset_size) + " MB") # MB
-        # if dataset_size > 1000: # more than a GB
-        #     pass
-        #     # print("El archivo es pesado, se realiza slicing para generar otros archivos con menor tamaño.")
-        #     # number_slices, new_slices_size = self.data_slicing()
-        #     # print("se crearon " + str(number_slices) + " archivos, con un tamaño aproximado de " + str(new_slices_size) + " MB cada uno.")
-        # else:
-        #     new_slices_size = dataset_size
-        aprox_bloques_por_crear, aprox_block_size = self.approximation(datafile_size)
-        print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
-        self.BLOCK_SIZE = self.MB_to_B(aprox_block_size/100) 
-        print("Actual block_size is: " + str(round(self.BLOCK_SIZE/1048576,3)) + " MB")
-
-#     def data_slicing(self):
-#         number_slices = 0
-#         new_slices_size = 0
-# #you need to add you path here
-#         with open(data_path , 'r', encoding='utf-8') as f1:
-#             ll = [json.loads(line.strip()) for line in f1.readlines()]
-
-#             #this is the total length size of the json file
-#             print(len(ll))
-
-#             #in here 2000 means we getting splits of 2000 tweets
-#             #you can define your own size of split according to your need
-#             size_of_the_split = 2000
-#             total = len(ll) // size_of_the_split
-
-#             #in here you will get the Number of splits
-#             number_slices = total + 1
-#             print(number_slices)
-
-#             for i in range(number_slices):
-#                 json.dump(ll[i * size_of_the_split:(i + 1) * size_of_the_split], open(data_folder_path + "data_split" + str(i+1) + ".json", 'w',encoding='utf8'), ensure_ascii=False, indent=True)
-#                 print("archivo " + str(i) + " creado")
-
-#             os.remove(data_path)
-
-#             new_slices_size = os.path.getsize(data_folder_path + "data_split1.json")
-#         return number_slices, new_slices_size
+        print("El dataset pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
+        if 0: #dataset_size > 1000: # more than a GB
+            pass
+            # print("El archivo es muy pesado, se realiza slicing para generar más archivos de menor tamaño.") # cada archivo de 55 MB aprox.
+            # exit_code_1 = os.system("split -b 53750k arxiv-metadata.json")
+            # exit_code_2 = os.system("cat xa* > arxiv-metadata.json")
+            # if not exit_code_1 and not exit_code_2: # successful
+            #     os.remove(data_path)
+            #     print("Slicing successfully")
+            #     lista_auxiliar = os.listdir(data_folder_path)
+            #     aprox_bloques_por_crear, aprox_block_size = self.approximation(os.path.getsize(data_folder_path + "/" + str(lista_auxiliar[0])))
+            #     print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
+            #     self.BLOCK_SIZE = self.MB_to_B(aprox_block_size/100) 
+            #     print("Actual block_size is: " + str(round(self.BLOCK_SIZE/1048576,3)) + " MB")
+            # else: # abort
+            #     print("Error, aborting slicing.")
+            #     lista_auxiliar = os.listdir(data_folder_path)
+            #     for file in lista_auxiliar:
+            #         if str(file) == str(data_path):
+            #             pass
+            #         else:
+            #             os.remove(data_folder_path + str(file))
+            #     print("Abort successfully")
+        else:
+            aprox_bloques_por_crear, aprox_block_size = self.approximation(datafile_size)
+            print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
+            self.BLOCK_SIZE = self.MB_to_B(math.log(aprox_block_size,10)) # to reduce the scale according to the approximation from the file size
+            print("Actual block_size is: " + str(self.B_to_MB(self.BLOCK_SIZE)) + " MB")
+        
 
     def approximation(self, datafile_size):
         aprox_bloques_por_crear = math.log(datafile_size, 2)
-        aprox_block_size = (datafile_size / aprox_bloques_por_crear)/1048576 # MB
+        aprox_block_size = self.B_to_MB((datafile_size / aprox_bloques_por_crear)) # MB
         return aprox_bloques_por_crear, aprox_block_size
 
     def MB_to_B(self, MB):
-        # 1 MB = 1048576 B
-        return MB*1048576
+        return round(MB*1048576,3)
+
+    def B_to_MB(self, B):
+        return round(B/1048576,3)
 
     def procesamiento_palabra(self, word):
         new_word = ""
@@ -334,6 +326,8 @@ class UBetterFixEverything():
     # clean the files (or delete the directory) from previous iterations
         # self.clean_directories()
 
+        print("Processing only a total of " + str(MAX) + " documents. (parameter specified)")
+
         local_inverted_index = {}
         documents_frequencies_list = []
         try:
@@ -406,19 +400,155 @@ class UBetterFixEverything():
             print("Problem reading: " + data_filename + " path.")
 
 
+    def binary_search(self, query_doc_frequency, query_keyword_inv_ind):
+        for keyword in query_doc_frequency:
+            low = 1
+            high = self.terminos_procesados
+            while low <= high:
+                mid = (low + high) // 2
+                candidate = lc.getline(final_inv_ind_path, mid).rstrip()
+                candidate_json = json.load(io.StringIO(candidate))
+                token = candidate_json.get("keyword") # get token from the line read
+                if token < keyword:
+                    low = mid + 1
+                elif token > keyword:
+                    high = mid - 1
+                else:
+                    query_keyword_inv_ind[keyword] = dict(candidate_json)
+                    break
 
-    def score(self, query):
+
+    def tf_idf_weight_and_cosine_score(self, docs_ids, scores, query_keyword_inv_ind, query_doc_frequency):
+        for keyword in query_keyword_inv_ind:
+            query_tf_idf_weight = math.log(query_doc_frequency[keyword] + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
+            for doc_id, frequency in query_keyword_inv_ind[keyword]["doc-ids"]:
+                if doc_id not in scores:
+                    scores[doc_id] = 0.0 # as a temp value, just to create the entry in the dictionary
+                    docs_ids.append(doc_id)
+                document_tf_idf_weight = math.log(frequency + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
+                
+                scores[doc_id] += query_tf_idf_weight * document_tf_idf_weight
+
+
+    def score_normalization(self, docs_ids, scores):
+        query_norms = {}
+        try:
+            with open(norm_doc_path, 'r', encoding="utf-8") as norm_doc:
+                for line in norm_doc:
+                    json_object = json.load(io.StringIO(line))
+                    key = list(json_object.keys())
+                    if key[0] in docs_ids:
+                        query_norms[key[0]] = json_object.get(key[0])
+                norm_doc.close()
+            for doc_id in scores:
+                scores[doc_id] = scores[doc_id] / query_norms[doc_id] # normalization
+
+        except IOError:
+            print("Problem reading: " + norm_doc_filename + " path.")
+
+    def get_documents(self, scores, documents_retrieved, docs_to_read):
+        try:
+            with open(data_path, 'r', encoding="utf-8") as datafile:
+                counter = 0
+                for document in datafile:
+                    json_object = json.load(io.StringIO(document))
+                    counter = counter + 1
+                    doc_id = str(json_object.get("id"))
+                    if doc_id in scores:
+                        documents_retrieved[doc_id] = json_object 
+                    if counter >= docs_to_read:
+                        break
+                datafile.close()
+        except IOError:
+            print("Problem reading: " + data_filename + " path.")
+
+
+    def score(self, query, docs_to_read, k):
         if self.NUMBER_OF_DOCUMENTS == 0:
             print("No documents were found. (0 documents loaded)")
             return 0
+        # process query
+        query = self.preprocesamiento(query)
+        
+        # some variables
+        query_doc_frequency = {}
+        query_keyword_inv_ind = {}
+        docs_ids = []
+        scores = {} # {doc_id: score}
+        documents_retrieved = {}
 
+        #create inverted index for query 
+        for token in query:
+            if token in query_doc_frequency:
+                query_doc_frequency[token] = query_doc_frequency[token] + 1
+            else:
+                query_doc_frequency[token] = 1
+        
+        # now we search the keyword in the final inverted index
+        print("Realizando busqueda binaria de los keyword en query.")
+        self.binary_search(query_doc_frequency, query_keyword_inv_ind) # we get all posting lisit from keyword in query into query_keywords_inverted_index
+
+        print("Calculando pesos TF_IDF y Cosine Score.")
+        self.tf_idf_weight_and_cosine_score(docs_ids, scores, query_keyword_inv_ind, query_doc_frequency)
+
+        print("Normalizando vectores.")
+        self.score_normalization(docs_ids, scores)
+ 
+        print("Ordenando scores.")
+        scores = dict(sorted(scores.items(), key=lambda item: item[1], reverse = True)) # order the scores in descending order
+        docs_ids = list(scores.keys())
+
+        # for i in range(10):
+        #     print("scores[" + str(docs_ids[i]) + "] -> " + str(scores[docs_ids[i]]))
+
+        print("Buscando documentos en el dataset.")
+        self.get_documents(scores, documents_retrieved, docs_to_read)
+
+        print("El query ha retornado un total de " + str(len(documents_retrieved)) + " documentos")
+        
+        return self.retrieve(k, docs_ids, scores, documents_retrieved)
+
+    def retrieve(self, k, docs_ids, scores, documents_retrieved):
+        k = int(k) # parsing, bc we receive strings from the frontend
+        documents_to_retrieve = []
+
+        for i in range(k):
+            if i < len(docs_ids):
+                temp_doc = {}
+                temp_doc["id"] = docs_ids[i]
+                temp_doc["score"] = scores[docs_ids[i]]
+                temp_doc["submitter"] = documents_retrieved[docs_ids[i]].get("submitter")
+                temp_doc["authors"] = documents_retrieved[docs_ids[i]].get("authors")
+                temp_doc["title"] = documents_retrieved[docs_ids[i]].get("title")
+                temp_doc["comments"] = documents_retrieved[docs_ids[i]].get("comments")
+                temp_doc["journal-ref"] = documents_retrieved[docs_ids[i]].get("journal-ref")
+                temp_doc["doi"] = documents_retrieved[docs_ids[i]].get("doi")
+                temp_doc["report-no"] = documents_retrieved[docs_ids[i]].get("report-no")
+                temp_doc["categories"] = documents_retrieved[docs_ids[i]].get("categories")
+                temp_doc["license"] = documents_retrieved[docs_ids[i]].get("license")
+                temp_doc["abstract"] = documents_retrieved[docs_ids[i]].get("abstract")
+                temp_doc["versions"] = documents_retrieved[docs_ids[i]].get("versions")
+                temp_doc["update_date"] = documents_retrieved[docs_ids[i]].get("update_date")
+                temp_doc["authors_parsed"] = documents_retrieved[docs_ids[i]].get("authors_parsed")
+                documents_to_retrieve.append(temp_doc)
+            else:
+                break
+
+        return documents_to_retrieve
 
 
 def main():
+    docs_to_read = 1000
     instance = UBetterFixEverything()
-    instance.load(1000) 
-    # query = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
-    # instance.score(query)
+    instance.load(docs_to_read) 
+    query_1 = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
+    query_2 = "We systematically explore the evolution of the merger of two carbon-oxygen\n(CO) white dwarfs. The dynamical evolution of a 0.9 Msun + 0.6 Msun CO white\ndwarf merger is followed by a three-dimensional SPH simulation. We use an\nelaborate prescription in which artificial viscosity is essentially absent,\nunless a shock is detected, and a much larger number of SPH particles than\nearlier calculations. Based on this simulation, we suggest that the central\nregion of the merger remnant can, once it has reached quasi-static equilibrium,\nbe approximated as a differentially rotating CO star, which consists of a\nslowly rotating cold core and a rapidly rotating hot envelope surrounded by a\ncentrifugally supported disc. We construct a model of the CO remnant that\nmimics the results of the SPH simulation using a one-dimensional hydrodynamic\nstellar evolution code and then follow its secular evolution. The stellar\nevolution models indicate that the growth of the cold core is controlled by\nneutrino cooling at the interface between the core and the hot envelope, and\nthat carbon ignition in the envelope can be avoided despite high effective\naccretion rates. This result suggests that the assumption of forced accretion\nof cold matter that was adopted in previous studies of the evolution of double\nCO white dwarf merger remnants may not be appropriate. Our results imply that\nat least some products of double CO white dwarfs merger may be considered good\ncandidates for the progenitors of Type Ia supernovae. In this case, the\ncharacteristic time delay between the initial dynamical merger and the eventual\nexplosion would be ~10^5 yr. (Abridged)."
+    query_2 = query_2.rstrip("\n")
+    docs = instance.score(query_2, docs_to_read, 10)
+
+    for i in docs:
+        print(i)
+
 
 main()
 
