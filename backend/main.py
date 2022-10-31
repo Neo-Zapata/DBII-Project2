@@ -550,6 +550,31 @@ def main():
         print(i)
 
 
-main()
+def result(query,topk):
+    docs_to_read = 1000
+    instance = UBetterFixEverything()
+    instance.load(docs_to_read) 
+    query = query.rstrip("\n")
+    docs = instance.score(query, docs_to_read, topk)
+    return docs
+
+
+app = Flask(__name__)
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == 'POST':
+        query = request.form['query']
+        topk = request.form['topk']
+        resultado = result(query,topk)
+        for i in resultado:
+            print(i)
+        return render_template("index_resultado.html",resultado=resultado)
+    return render_template("index.html")
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
