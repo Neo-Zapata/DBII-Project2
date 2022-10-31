@@ -37,6 +37,40 @@ Es un método para estructurar la información más importante de un texto compl
 
 ## Funciones importantes
 
+### Clase principal
+Es una clase que contiene todas las funciones necesarias para procesar la query y todos los artículos académicos de forma eficiente.
+```python
+class UBetterFixEverything():
+```
+
+### Función init
+EXPLICACION
+```python
+def __init__(self, c, docs_to_read):
+```
+
+
+### Función load
+EXPLICACION
+```python
+def load(self, MAX):
+```
+
+### Función score
+EXPLICACION
+```python
+def score(self, query, docs_to_read, k):
+```
+
+### Función retrieve
+EXPLICACION
+```python
+def retrieve(self, k, docs_ids, scores, documents_retrieved):
+```
+
+
+
+
 EXPLICACIÓN DE FUNCIONES
 
 # Frontend
