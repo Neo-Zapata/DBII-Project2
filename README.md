@@ -13,7 +13,7 @@ El objetivo del proyecto es crear un motor de búsqueda que a partir de una quer
 >TODO
 >
 ## Inverted index
->TODO
+Es un método para estructurar la información más importante de un texto completo. La composición se da mediante un documento el cual tiene términos con una determinada frecuencia. En el caso del proyecto la información de la base de datos es organizada para retornar datos de una forma rápida y óptima. La consulta enviada también se procesa y organiza de la misma manera, posteriormente se genera un score de similitud con todos los documentos de la base de datos antes descritos. Finalmente se devuelven los documentos con mayor score los cuales se consideran más importantes.
 
 ## **Tabla de contenido**
 * [Dataset](#dataset)
