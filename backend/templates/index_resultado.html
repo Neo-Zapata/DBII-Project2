@@ -1,0 +1,6 @@
+{%extends "index.html"%}
+{% block content%}
+{% for value in resultado %}
+<p>Titulo: {{value.title}} <br>Autor: {{value.authors}} <br>ID: {{value.id}} <br>Score: {{value.score}} </p>
+{% endfor %}
+{% endblock %}

@@ -4,6 +4,7 @@ import linecache as lc
 from operator import index
 import os
 import io
+from flask import Flask, render_template, request, redirect, url_for
 from re import A
 import sys
 from queue import PriorityQueue
@@ -196,6 +197,8 @@ class UBetterFixEverything():
         # sent
         sorted_keys = sorted(local_inverted_index.keys())
         try:
+            if not os.path.exists(cwd + "/documents/inverted_index"):
+                os.makedirs(cwd + "/documents/inverted_index")
             with open(inv_ind_path + str(self.AUX_FILE_NUMBER) + ".json", 'a', encoding = "utf-8") as inv_ind_file:
                 self.accesos_disco_inverted_index += 1
                 for keyword in sorted_keys:
@@ -233,6 +236,8 @@ class UBetterFixEverything():
 
     def upload_document_frequency_to_disk(self, documents_frequencies_list):
         try:
+            if not os.path.exists(cwd + "/documents/norm_doc"):
+                os.makedirs(cwd + "/documents/norm_doc")
             with open(norm_doc_path, 'a', encoding = "utf-8") as norm_file:
                 self.accesos_disco_DF += 1
                 for document_frequency in documents_frequencies_list:
@@ -330,7 +335,9 @@ class UBetterFixEverything():
             
                 aux_list.append(temp_inv_ind)
                 
-                if len(aux_list) > 1000: # procesamos de 1000 en 1000                    
+                if len(aux_list) > 1000: # procesamos de 1000 en 1000   
+                    if not os.path.exists(cwd + "/documents/final_inverted_index"):
+                        os.makedirs(cwd + "/documents/final_inverted_index")                 
                     with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
                         self.accesos_disco_merging += 1
                         for inv_ind in aux_list:
@@ -341,7 +348,8 @@ class UBetterFixEverything():
                     final_inv_ind.close()
 
         # upload last block of merged terms
-
+            if not os.path.exists(cwd + "/documents/final_inverted_index"):
+                os.makedirs(cwd + "/documents/final_inverted_index")
             with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
                 self.accesos_disco_merging += 1
                 for inv_ind in aux_list:
@@ -481,6 +489,8 @@ class UBetterFixEverything():
     def score_normalization(self, docs_ids, scores):
         query_norms = {}
         try:
+            if not os.path.exists(cwd + "/documents/norm_doc"):
+                os.makedirs(cwd + "/documents/norm_doc")
             with open(norm_doc_path, 'r', encoding="utf-8") as norm_doc:
                 self.accesos_a_norm_doc_for_normalization += 1
                 for line in norm_doc:
@@ -645,8 +655,8 @@ def menu():
     return int(docs_to_read), c, query, int(k)
 
 
-def main():
-    docs_to_read, c, query, k = menu()
+def main(docs_to_read, c, query, k):
+    # docs_to_read, c, query, k = menu()
 
     instance = UBetterFixEverything(c, docs_to_read)
 
@@ -667,10 +677,39 @@ def main():
 
     accesos = instance.get_disk_accesses()
     print("se accedio a disco un total de: " + str(accesos))
-    # for i in docs:
-    #     print(i)
+
+    return docs
 
 
-main()
+# main()
+
+# def result(query,topk):
+#     docs_to_read = 1000
+#     instance = UBetterFixEverything()
+#     instance.load(docs_to_read) 
+#     query = query.rstrip("\n")
+#     docs = instance.score(query, docs_to_read, topk)
+#     return docs
+
+
+app = Flask(__name__)
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == 'POST':
+        docs_to_read = request.form['docs_to_read']
+        c = "Yes"
+        query = request.form['query']
+        k = request.form['topk']
+        resultado = main(int(docs_to_read), c, query, int(k))
+        for i in resultado:
+            print(i)
+        return render_template("index_resultado.html",resultado=resultado)
+    return render_template("index.html")
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
