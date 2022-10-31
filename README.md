@@ -4,7 +4,7 @@
 * Neo Marcelo Zapata Gallegos
 * Harold Canto Vidal
 * Christian Rojas Rojas
-* Eros 
+* Eros Carhuancho Espejo
 ## Objetivo:
 >TODO
 
