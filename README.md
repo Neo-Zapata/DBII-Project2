@@ -60,13 +60,13 @@ def load(self, MAX):
 ```
 
 ### Función score
-EXPLICACION
+Esta función descarta los stopwords antes procesados por el constructor y traerá los documentos científicos más parecidos a la query. Luego utilizaremos la  función tf_idf_weight_and_cosine_score para devolver un ranking de estos mismos documentos.
 ```python
 def score(self, query, docs_to_read, k):
 ```
 
 ### Función retrieve
-EXPLICACION
+Finalmente esta función retorna solo los k documentos más parecidos a la query.
 ```python
 def retrieve(self, k, docs_ids, scores, documents_retrieved):
 ```
