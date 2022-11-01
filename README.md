@@ -8,6 +8,18 @@
 # Objetivo:
 El objetivo del proyecto es crear un motor de búsqueda que a partir de una query textual podamos buscar los artículos académicos de nuestra base de datos que más se asemejan a esta, rankeando los resultados mediante un score. Este proceso se dará aplicando los conceptos aprendidos en clase como el índice invertido, la similitud de cosenos, la normalización de términos, etc. Posteriormente mediremos el tiempo que tarda esta filtración de información aplicada con Python y lo compararemos con el tiempo que tarda hacerlo con postgres.  
 
+# Tabla de contenido
+- [Backend](#Backend)
+  * [Dataset](#Dataset)
+  * [Inverted index](#Inverted-index)
+  * [Funciones importantes](#Funciones-importantes)
+    + [Clase principal](#Clase-principal)
+    + [Función load](#Función-load)
+    + [Función score](#Función-score)
+    + [Función retrieve](#Función-retrieve)
+- [Frontend](#Frontend)
+  * [Comparativa de Python y Postgres](#Comparativa-de-Python-y-Postgres)
+
 # Backend
 
 ## Dataset
