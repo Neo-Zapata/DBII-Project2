@@ -47,6 +47,7 @@ class UBetterFixEverything():
     accesos_disco_merging = 0
     accesos_disco_data = 0
     accesos_a_norm_doc_for_normalization = 0
+    accesos_getlines_from_inv_ind = 0
     stoplist = []
 
     def __init__(self, c, docs_to_read):
@@ -65,11 +66,10 @@ class UBetterFixEverything():
     def get_disk_accesses(self):
         print("Accesos a stoplist: " + str(self.accesos_disco_stoplist))
         print("Accesos a los indices invertidos temporales: " + str(self.accesos_disco_inverted_index))
-        print("Accesos a document frequencies NORM_DOC: " + str(self.accesos_disco_DF))
-        print("Accesos a final_inverted_index for merging: " + str(self.accesos_disco_merging))
+        print("Accesos a final_inverted_index: " + str(self.accesos_disco_merging + self.accesos_getlines_from_inv_ind))
         print("Accesos a dataset file: " + str(self.accesos_disco_data))
-        print("Accesos a norm doc to perform normalization of vectors: " + str(self.accesos_a_norm_doc_for_normalization))
-        return (self.accesos_disco_stoplist + self.accesos_disco_inverted_index + self.accesos_disco_DF + self.accesos_disco_merging + self.accesos_disco_data + self.accesos_a_norm_doc_for_normalization)
+        print("Accesos al documento de normas: " + str(self.accesos_a_norm_doc_for_normalization + self.accesos_disco_DF))
+        return (self.accesos_disco_stoplist + self.accesos_disco_inverted_index + self.accesos_disco_DF + self.accesos_disco_merging + self.accesos_disco_data + self.accesos_a_norm_doc_for_normalization + self.accesos_getlines_from_inv_ind)
 
     def approximation(self, docs_to_read):
         aprox_bloques_por_crear = round(math.log(docs_to_read, 2),3)
@@ -236,6 +236,7 @@ class UBetterFixEverything():
     def initialize_list_of_buffers(self, buffers, active_files_index, priority_queue, buffers_line_number):
         for i in range(self.AUX_FILE_NUMBER):
             inv_ind = lc.getline(inv_ind_path + str(i+1) + ".json", 1).rstrip() # get first line from the auxiliar file. which is the keywords and a posting list of all the documents it appears, along with the document frequency of each document.
+            self.accesos_getlines_from_inv_ind += 1
             if inv_ind != "":
                 json_object = json.load(io.StringIO(inv_ind)) # load json object
                 key = list(json_object.keys()) # get keywords from the json object
@@ -264,7 +265,8 @@ class UBetterFixEverything():
                     for posting_list in buffers[index_file][1]: # getting the posting list
                         temp_inv_ind["doc-ids"].append(posting_list)
 # replace the buffer read
-                    inv_ind = lc.getline(inv_ind_path + str(index_file+1) + ".json", buffers_line_number[index_file]).rstrip() 
+                    inv_ind = lc.getline(inv_ind_path + str(index_file+1) + ".json", buffers_line_number[index_file]).rstrip()
+                    self.accesos_getlines_from_inv_ind += 1 
                     buffers_line_number[index_file] = buffers_line_number[index_file] + 1
                     if inv_ind == "": # end of the file has been reached
                         active_files_index.remove(index_file)
@@ -284,6 +286,7 @@ class UBetterFixEverything():
                             temp_inv_ind["doc-ids"].append(posting_list) 
 # replace the buffer read
                         inv_ind = lc.getline(inv_ind_path + str(other_index_file+1) + ".json", buffers_line_number[other_index_file]).rstrip() 
+                        self.accesos_getlines_from_inv_ind += 1
                         buffers_line_number[other_index_file] = buffers_line_number[other_index_file] + 1
                         if inv_ind == "": # end of the file has been reached
                             active_files_index.remove(other_index_file)
@@ -439,6 +442,7 @@ class UBetterFixEverything():
             while low <= high:
                 mid = (low + high) // 2
                 candidate = lc.getline(final_inv_ind_path, mid).rstrip()
+                self.accesos_getlines_from_inv_ind += 1
                 candidate_json = json.load(io.StringIO(candidate))
                 token = candidate_json.get("keyword") # get token from the line read
                 if token < keyword:
@@ -638,17 +642,19 @@ def search(instance, docs_to_read, c, query, k):
     time1 = time.time()
     k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k)
     time2 = time.time()
-    print("Query processing, score similarity and fetching similar documents took " + str(round((time2 - time1) * 1000)) + " ms.")
+    tiempo_f1 = str(round((time2 - time1) * 1000))
+    print("Query processing, score similarity and fetching similar documents took " + tiempo_f1 + " ms.")
 
     time1 = time.time()
     docs = instance.retrieve(k, docs_ids, scores, documents_retrieved)
     time2 = time.time()
-    print("Retrieving only the k documents took " + str(round((time2 - time1) * 1000)) + " ms.")
+    tiempo_f2 = str(round((time2 - time1) * 1000))
+    print("Retrieving only the k documents took " + tiempo_f2 + " ms.")
 
     accesos = instance.get_disk_accesses()
     print("se accedio a disco un total de: " + str(accesos))
 
-    return docs
+    return docs, str(int(tiempo_f1) + int(tiempo_f2))
 
 def load_data(instance, docs_to_read):
     
@@ -676,7 +682,22 @@ def postgres_search(query, k):
 
         list_of_tuples = cur.fetchall()
 
-        
+        postgres_insert_query = "explain analyze select id_,title, ts_rank_cd(search_txt, query) as score from json_to_pos, websearch_to_tsquery('english', %s) query where query @@ search_txt order by  score desc limit %s;"
+        record_to_insert = (query, str(k))
+        cur.execute(cur.mogrify(postgres_insert_query, record_to_insert))
+
+        analyzed_fetched = cur.fetchall()
+
+        execution_time1 = analyzed_fetched[-1]
+        planning_time1 = analyzed_fetched[-2]
+
+        execution_time = execution_time1[0].replace("Execution Time: ", "")
+        execution_time = execution_time.replace(" ms", "")
+
+        print()
+        print(execution_time)
+        print()
+
 
         for tup in list_of_tuples:
             temp_doc = {}
@@ -696,20 +717,8 @@ def postgres_search(query, k):
         if conn is not None:
             conn.close()
             print('Database connection closed.')
-            return documents_to_retrieve
+            return documents_to_retrieve, execution_time
 
-
-
-
-# menu()
-
-# def result(query,topk):
-#     docs_to_read = 1000
-#     instance = UBetterFixEverything()
-#     instance.load(docs_to_read) 
-#     query = query.rstrip("\n")
-#     docs = instance.score(query, docs_to_read, topk)
-#     return docs
 
 
 app = Flask(__name__)
@@ -729,9 +738,9 @@ def index():
         query = request.form['query']
         k = request.form['topk']
 
-        resultado = search(instance, int(docs_to_read), c, query, int(k))
+        resultado, time = search(instance, int(docs_to_read), c, query, int(k))
 
-        postgres_resultado = postgres_search(query, k)
+        postgres_resultado, execution_time = postgres_search(query, k)
 
         # for i in resultado:
         #     print(i)
@@ -743,7 +752,7 @@ def index():
         # for i in postgres_resultado:
         #     print(i)
 
-        return render_template("index_resultado.html",resultado=resultado, postgres_resultado=postgres_resultado)
+        return render_template("index_resultado.html",resultado=resultado, postgres_resultado=postgres_resultado, tiempo_python = time, tiempo_postgres = execution_time)
     return render_template("index.html")
 
 
