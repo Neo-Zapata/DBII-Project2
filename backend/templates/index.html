@@ -27,11 +27,15 @@
         <div class="row">
             <div class="col-sm">
                 <h2>Top K Python</h2>
-                {% block content%}
-                {% endblock %}
+                {% for value in resultado %}
+                <p>ID: {{value.id}} <br>Title: {{value.title}} <br>Score: {{value.score}}</p>
+                {% endfor %}
             </div>
             <div class="col-sm">
                 <h2>Top K PostgreSQL</h2>
+                {% for value in postgres_resultado %}
+                <p>ID: {{value.id}} <br>Title: {{value.title}} <br>Score: {{value.score}}</p>
+                {% endfor %}
             </div>
         </div>
     </div>

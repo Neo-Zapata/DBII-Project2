@@ -1,5 +1,6 @@
 import json
 import time
+import psycopg2
 import linecache as lc
 from operator import index
 import os
@@ -46,10 +47,14 @@ class UBetterFixEverything():
     accesos_disco_merging = 0
     accesos_disco_data = 0
     accesos_a_norm_doc_for_normalization = 0
+    stoplist = []
 
     def __init__(self, c, docs_to_read):
         if c == "Yes":
             self.clean_directories()
+
+        self.load_stoplist()
+
         print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
         print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
         aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
@@ -90,7 +95,7 @@ class UBetterFixEverything():
         return new_word.strip('-') # we remove them
 
 
-    def preprocesamiento(self, texto, stoplist): # tokenization | Stopwords filter | Stemming
+    def preprocesamiento(self, texto): # tokenization | Stopwords filter | Stemming
         # tokenizar
 
         palabras = nltk.word_tokenize(texto.lower())
@@ -99,7 +104,7 @@ class UBetterFixEverything():
             # filtrar stopwords
             palabras_limpias = []
             for token in palabras:
-                if token not in stoplist:
+                if token not in self.stoplist:
                     palabras_limpias.append(token)
 
             # process each clean word
@@ -331,24 +336,24 @@ class UBetterFixEverything():
             print("Problem reading: " + final_inv_ind_filename + " path.")
             return 0
 
-    def load_stoplist(self, stoplist):
+    def load_stoplist(self):
         with open(stoplist_path, encoding='latin-1') as f:
             self.accesos_disco_stoplist += 1
             for line in f:
-                stoplist.append(line.strip())
+                self.stoplist.append(line.strip())
         f.close()
 
-        stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
+        self.stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
             
 
     def load(self, MAX):
-        stoplist = []
+        # stoplist = []
         print("Processing only a total of " + str(MAX) + " documents. (parameter specified)")
         local_inverted_index = {}
         documents_frequencies_list = []
         try:
 
-            self.load_stoplist(stoplist)
+            # self.load_stoplist(stoplist)
 
             with open(data_path, 'r') as f:
                 self.accesos_disco_data += 1
@@ -359,7 +364,7 @@ class UBetterFixEverything():
 
     # separate the attributes needed (the id and the abstract) // maybe also the title
                     doc_id = doc_object.get("id") 
-                    texto_procesado = self.preprocesamiento(doc_object.get("abstract"), stoplist)
+                    texto_procesado = self.preprocesamiento(doc_object.get("abstract"))
                     self.insert_document_into_local_inverted_index(local_inverted_index, texto_procesado, doc_id)
 
     # update the document_frequency
@@ -421,7 +426,7 @@ class UBetterFixEverything():
             else:
                 print("Error merging the files.")
 
-            return stoplist
+            # return stoplist
 
         except IOError:
             print("Problem reading: " + data_filename + " path.")
@@ -494,12 +499,12 @@ class UBetterFixEverything():
             print("Problem reading: " + data_filename + " path.")
 
 
-    def score(self, query, docs_to_read, k, stoplist):
+    def score(self, query, docs_to_read, k):
         if self.NUMBER_OF_DOCUMENTS == 0:
             print("No documents were found. (0 documents loaded)")
             return 0
         # process query
-        query = self.preprocesamiento(query, stoplist)
+        query = self.preprocesamiento(query)
         
         # some variables
         query_doc_frequency = {}
@@ -626,18 +631,12 @@ def menu():
     return int(docs_to_read), c, query, int(k)
 
 
-def main(docs_to_read, c, query, k):
+def search(instance, docs_to_read, c, query, k):
     # docs_to_read, c, query, k = menu()
 
-    instance = UBetterFixEverything(c, docs_to_read)
 
     time1 = time.time()
-    stoplist = instance.load(docs_to_read) 
-    time2 = time.time()
-    print("Document loading took " + str(round((time2 - time1) * 1000)) + " ms.")
-
-    time1 = time.time()
-    k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k, stoplist)
+    k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k)
     time2 = time.time()
     print("Query processing, score similarity and fetching similar documents took " + str(round((time2 - time1) * 1000)) + " ms.")
 
@@ -650,6 +649,56 @@ def main(docs_to_read, c, query, k):
     print("se accedio a disco un total de: " + str(accesos))
 
     return docs
+
+def load_data(instance, docs_to_read):
+    
+
+    time1 = time.time()
+    instance.load(docs_to_read) 
+    time2 = time.time()
+    print("Document loading took " + str(round((time2 - time1) * 1000)) + " ms.")
+
+
+
+def postgres_search(query, k):
+    # process query
+    query = query.replace(" ", " or ")
+    documents_to_retrieve = []
+
+    try:
+        conn = psycopg2.connect("dbname=postgres user=postgres  password=postgres") # user and password may change depending on ur settings
+        
+        cur = conn.cursor()
+
+        postgres_insert_query = "select id_,title, ts_rank_cd(search_txt, query) as score from json_to_pos, websearch_to_tsquery('english', %s) query where query @@ search_txt order by  score desc limit %s;"
+        record_to_insert = (query, str(k))
+        cur.execute(postgres_insert_query, record_to_insert)
+
+        list_of_tuples = cur.fetchall()
+
+        
+
+        for tup in list_of_tuples:
+            temp_doc = {}
+            temp_doc["id"]      = tup[0]
+            temp_doc["title"]   = tup[1]
+            temp_doc["score"]   = tup[2]
+            documents_to_retrieve.append(temp_doc)
+
+
+
+        conn.commit()
+        cur.close()
+        conn.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+            print('Database connection closed.')
+            return documents_to_retrieve
+
+
 
 
 # menu()
@@ -669,14 +718,32 @@ app = Flask(__name__)
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == 'POST':
+
         docs_to_read = request.form['docs_to_read']
         c = "Yes"
+
+        instance = UBetterFixEverything(c, int(docs_to_read))
+
+        load_data(instance, int(docs_to_read))
+        
         query = request.form['query']
         k = request.form['topk']
-        resultado = main(int(docs_to_read), c, query, int(k))
-        for i in resultado:
-            print(i)
-        return render_template("index_resultado.html",resultado=resultado)
+
+        resultado = search(instance, int(docs_to_read), c, query, int(k))
+
+        postgres_resultado = postgres_search(query, k)
+
+        # for i in resultado:
+        #     print(i)
+
+        # print()
+        # print()
+        # print()
+
+        # for i in postgres_resultado:
+        #     print(i)
+
+        return render_template("index_resultado.html",resultado=resultado, postgres_resultado=postgres_resultado)
     return render_template("index.html")
 
 
