@@ -18,23 +18,23 @@
     <div class="form-group">
         <form action="" method="post">
             <textarea id="query" name="query" type="search" class="form-control rounded" placeholder="Write your query here" aria-label="Search" aria-describedby="search-addon" ></textarea>
-            <input id="docs_to_read" name="docs_to_read" type="text"  class="form-control " placeholder="Documentos a leer del total" aria-label="Search" aria-describedby="search-addon" />
             <input id="topk" name="topk" type="text"  class="form-control " placeholder="Top k" aria-label="Search" aria-describedby="search-addon" />
-            <input type="submit" id="send-signup" class="btn btn-outline-primary" name="signup" value="Buscar" />
+            <input type="submit" id="send-signup" class="btn btn-outline-primary" name="action1" value="value1" />
+            <input type="submit" id="send-signup" class="btn btn-outline-primary" name="action2" value="value2" />
         </form>
     </div> 
     <div class="container ">
         <div class="row">
             <div class="col-sm">
                 <h2>Top K Python</h2>
-                <p> Time: {{ tiempo_python }} ms</p>
+                <p> Time: {{ python_time }} ms</p>
                 {% for value in resultado %}
                 <p>ID: {{value.id}} <br>Title: {{value.title}} <br>Score: {{value.score}}</p>
                 {% endfor %}
             </div>
             <div class="col-sm">
                 <h2>Top K PostgreSQL</h2>
-                <p> Time: {{ tiempo_postgres }} ms</p>
+                <p> Time: {{ postgres_time }} ms</p>
                 {% for value in postgres_resultado %}
                 <p>ID: {{value.id}} <br>Title: {{value.title}} <br>Score: {{value.score}}</p>
                 {% endfor %}

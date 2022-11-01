@@ -49,19 +49,21 @@ class UBetterFixEverything():
     accesos_a_norm_doc_for_normalization = 0
     accesos_getlines_from_inv_ind = 0
     stoplist = []
+    docs_ids = []
 
-    def __init__(self, c, docs_to_read):
+    def __init__(self, c):#, docs_to_read):
+
         if c == "Yes":
             self.clean_directories()
 
         self.load_stoplist()
 
-        print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
-        print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
-        aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
-        print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) 
-        + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
-        self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+        # print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
+        # print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
+        # aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
+        # print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) 
+        # + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
+        # self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
         
     def get_disk_accesses(self):
         print("Accesos a stoplist: " + str(self.accesos_disco_stoplist))
@@ -221,6 +223,20 @@ class UBetterFixEverything():
 
 
     def clean_directories(self):
+        self.terminos_procesados = 0
+        self.NUMBER_OF_DOCUMENTS = 0
+        self.AUX_FILE_NUMBER = 1
+        self.BLOCK_SIZE = 0 # bytes
+        self.accesos_disco_stoplist = 0
+        self.accesos_disco_inverted_index = 0
+        self.accesos_disco_DF = 0
+        self.accesos_disco_merging = 0
+        self.accesos_disco_data = 0
+        self.accesos_a_norm_doc_for_normalization = 0
+        self.accesos_getlines_from_inv_ind = 0
+        self.stoplist = []
+        self.docs_ids = []
+        
         clean_dir_1 = os.listdir(path_to_clean_1) # archivos de normas
         clean_dir_2 = os.listdir(path_to_clean_2) # archivo de indices invertidos
         clean_dir_3 = os.listdir(path_to_clean_3) # archivo con el final inverted index
@@ -299,7 +315,7 @@ class UBetterFixEverything():
                     else:
                         # print("Se acabo el keyword " + str(keyword) + ", ahora estamos en " + str(other_keyword))
                         priority_queue.put((other_keyword, other_index_file))
-                        break;
+                        break
 
         # at this point, 1 keyword has been succesfully processed (it means we have the complete posting lists for that keyword)
         # to avoid many accesses to disk, we store it into a list and when it reaches a specific size, we upload it to disk (as a block)
@@ -310,7 +326,7 @@ class UBetterFixEverything():
                 
                 if len(aux_list) > 1000: # procesamos de 1000 en 1000   
                     if not os.path.exists(cwd + "/documents/final_inverted_index"):
-                        os.makedirs(cwd + "/documents/final_inverted_index")                 
+                        os.makedirs(cwd + "/documents/final_inverted_index")                
                     with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
                         self.accesos_disco_merging += 1
                         for inv_ind in aux_list:
@@ -454,19 +470,19 @@ class UBetterFixEverything():
                     break
 
 
-    def tf_idf_weight_and_cosine_score(self, docs_ids, scores, query_keyword_inv_ind, query_doc_frequency):
+    def tf_idf_weight_and_cosine_score(self, scores, query_keyword_inv_ind, query_doc_frequency):
         for keyword in query_keyword_inv_ind:
             query_tf_idf_weight = math.log(query_doc_frequency[keyword] + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
             for doc_id, frequency in query_keyword_inv_ind[keyword]["doc-ids"]:
                 if doc_id not in scores:
                     scores[doc_id] = 0.0 # as a temp value, just to create the entry in the dictionary
-                    docs_ids.append(doc_id)
+                    self.docs_ids.append(doc_id)
                 document_tf_idf_weight = math.log(frequency + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
                 
                 scores[doc_id] += query_tf_idf_weight * document_tf_idf_weight
 
 
-    def score_normalization(self, docs_ids, scores):
+    def score_normalization(self, scores):
         query_norms = {}
         try:
             if not os.path.exists(cwd + "/documents/norm_doc"):
@@ -476,7 +492,7 @@ class UBetterFixEverything():
                 for line in norm_doc:
                     json_object = json.load(io.StringIO(line))
                     key = list(json_object.keys())
-                    if key[0] in docs_ids:
+                    if key[0] in self.docs_ids:
                         query_norms[key[0]] = json_object.get(key[0])
                 norm_doc.close()
             for doc_id in scores:
@@ -513,7 +529,6 @@ class UBetterFixEverything():
         # some variables
         query_doc_frequency = {}
         query_keyword_inv_ind = {}
-        docs_ids = []
         scores = {} # {doc_id: score}
         documents_retrieved = {}
 
@@ -529,14 +544,14 @@ class UBetterFixEverything():
         self.binary_search(query_doc_frequency, query_keyword_inv_ind) # we get all posting lisit from keyword in query into query_keywords_inverted_index
 
         print("Calculando pesos TF_IDF y Cosine Score.")
-        self.tf_idf_weight_and_cosine_score(docs_ids, scores, query_keyword_inv_ind, query_doc_frequency)
+        self.tf_idf_weight_and_cosine_score(scores, query_keyword_inv_ind, query_doc_frequency)
 
         print("Normalizando vectores.")
-        self.score_normalization(docs_ids, scores)
+        self.score_normalization(scores)
  
         print("Ordenando scores.")
         scores = dict(sorted(scores.items(), key=lambda item: item[1], reverse = True)) # order the scores in descending order
-        docs_ids = list(scores.keys())
+        self.docs_ids = list(scores.keys())
 
         # for i in range(10):
         #     print("scores[" + str(docs_ids[i]) + "] -> " + str(scores[docs_ids[i]]))
@@ -546,30 +561,30 @@ class UBetterFixEverything():
 
         print("El query ha retornado un total de " + str(len(documents_retrieved)) + " documentos")
         
-        return k, docs_ids, scores, documents_retrieved
+        return k, scores, documents_retrieved
 
-    def retrieve(self, k, docs_ids, scores, documents_retrieved):
+    def retrieve(self, k, scores, documents_retrieved):
         k = int(k) # parsing, bc we receive strings from the frontend
         documents_to_retrieve = []
 
         for i in range(k):
-            if i < len(docs_ids):
+            if i < len(self.docs_ids):
                 temp_doc = {}
-                temp_doc["id"] = docs_ids[i]
-                temp_doc["score"] = scores[docs_ids[i]]
-                temp_doc["submitter"] = documents_retrieved[docs_ids[i]].get("submitter")
-                temp_doc["authors"] = documents_retrieved[docs_ids[i]].get("authors")
-                temp_doc["title"] = documents_retrieved[docs_ids[i]].get("title")
-                temp_doc["comments"] = documents_retrieved[docs_ids[i]].get("comments")
-                temp_doc["journal-ref"] = documents_retrieved[docs_ids[i]].get("journal-ref")
-                temp_doc["doi"] = documents_retrieved[docs_ids[i]].get("doi")
-                temp_doc["report-no"] = documents_retrieved[docs_ids[i]].get("report-no")
-                temp_doc["categories"] = documents_retrieved[docs_ids[i]].get("categories")
-                temp_doc["license"] = documents_retrieved[docs_ids[i]].get("license")
-                temp_doc["abstract"] = documents_retrieved[docs_ids[i]].get("abstract")
-                temp_doc["versions"] = documents_retrieved[docs_ids[i]].get("versions")
-                temp_doc["update_date"] = documents_retrieved[docs_ids[i]].get("update_date")
-                temp_doc["authors_parsed"] = documents_retrieved[docs_ids[i]].get("authors_parsed")
+                temp_doc["id"] = self.docs_ids[i]
+                temp_doc["score"] = scores[self.docs_ids[i]]
+                temp_doc["submitter"] = documents_retrieved[self.docs_ids[i]].get("submitter")
+                temp_doc["authors"] = documents_retrieved[self.docs_ids[i]].get("authors")
+                temp_doc["title"] = documents_retrieved[self.docs_ids[i]].get("title")
+                temp_doc["comments"] = documents_retrieved[self.docs_ids[i]].get("comments")
+                temp_doc["journal-ref"] = documents_retrieved[self.docs_ids[i]].get("journal-ref")
+                temp_doc["doi"] = documents_retrieved[self.docs_ids[i]].get("doi")
+                temp_doc["report-no"] = documents_retrieved[self.docs_ids[i]].get("report-no")
+                temp_doc["categories"] = documents_retrieved[self.docs_ids[i]].get("categories")
+                temp_doc["license"] = documents_retrieved[self.docs_ids[i]].get("license")
+                temp_doc["abstract"] = documents_retrieved[self.docs_ids[i]].get("abstract")
+                temp_doc["versions"] = documents_retrieved[self.docs_ids[i]].get("versions")
+                temp_doc["update_date"] = documents_retrieved[self.docs_ids[i]].get("update_date")
+                temp_doc["authors_parsed"] = documents_retrieved[self.docs_ids[i]].get("authors_parsed")
                 documents_to_retrieve.append(temp_doc)
             else:
                 break
@@ -640,13 +655,13 @@ def search(instance, docs_to_read, c, query, k):
 
 
     time1 = time.time()
-    k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k)
+    k, scores, documents_retrieved = instance.score(query, docs_to_read, k)
     time2 = time.time()
     tiempo_f1 = str(round((time2 - time1) * 1000))
     print("Query processing, score similarity and fetching similar documents took " + tiempo_f1 + " ms.")
 
     time1 = time.time()
-    docs = instance.retrieve(k, docs_ids, scores, documents_retrieved)
+    docs = instance.retrieve(k, scores, documents_retrieved)
     time2 = time.time()
     tiempo_f2 = str(round((time2 - time1) * 1000))
     print("Retrieving only the k documents took " + tiempo_f2 + " ms.")
@@ -658,6 +673,10 @@ def search(instance, docs_to_read, c, query, k):
 
 def load_data(instance, docs_to_read):
     
+    aprox_bloques_por_crear, aprox_block_size = instance.approximation(docs_to_read)   
+    instance.BLOCK_SIZE = instance.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+
+    print(instance.BLOCK_SIZE)
 
     time1 = time.time()
     instance.load(docs_to_read) 
@@ -671,6 +690,9 @@ def load_data_in_postgres(docs_to_read):
         cur = conn.cursor()
 
         postgres_insert_query = "DROP TABLE IF EXISTS json_to_pos CASCADE;"
+        cur.execute(postgres_insert_query)
+
+        postgres_insert_query = "SET enable_seqscan = off;"
         cur.execute(postgres_insert_query)
 
         # now we create the table and load the entries and implement the GIN index
@@ -788,31 +810,43 @@ def postgres_search(query, k):
 app = Flask(__name__)
 
 
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == 'POST':
-
         docs_to_read = request.form['docs_to_read']
-        c = "Yes"
-
-        instance = UBetterFixEverything(c, int(docs_to_read))
 
         load_data(instance, int(docs_to_read))
         load_data_in_postgres(int(docs_to_read))
-        
-        query = request.form['query']
-        k = request.form['topk']
 
-        resultado, time = search(instance, int(docs_to_read), c, query, int(k))
-
-        postgres_resultado, execution_time = postgres_search(query, k)
+        return redirect(url_for('data_cargada', docs_to_read=docs_to_read, c=c))
+    return render_template('cargar_data.html')
 
 
-        return render_template("index_resultado.html",resultado=resultado, postgres_resultado=postgres_resultado, tiempo_python = time, tiempo_postgres = execution_time)
-    return render_template("index.html")
+@app.route("/<docs_to_read>/<c>", methods=["GET", "POST"])
+def data_cargada(docs_to_read, c):
+    if request.method == 'POST':
+        if request.form.get('action1') == 'value1':
+            print("Se cargaran",docs_to_read,"datos")
+
+            query = request.form['query']
+            k = request.form['topk']
+
+            resultado, time = search(instance, int(docs_to_read), c, query, int(k))
+
+            postgres_resultado, execution_time = postgres_search(query, k)
+
+            return render_template("index.html",resultado=resultado, postgres_resultado=postgres_resultado, python_time = time, postgres_time = execution_time)
+        elif  request.form.get('action2') == 'value2':
+            instance.clean_directories()
+            return redirect(url_for('index'))
+    return render_template('index.html')
+
 
 
 if __name__ == '__main__':
+    c = "Yes"
+    instance = UBetterFixEverything(c)
     app.run(debug=True)
 
 
