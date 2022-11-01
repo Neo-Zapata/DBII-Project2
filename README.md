@@ -97,5 +97,5 @@ Las imágenes muestran los resultados de una consulta con la implementación de 
 
 
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado.png)
-
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado2.png)
 
