@@ -40,7 +40,6 @@ class UBetterFixEverything():
     NUMBER_OF_DOCUMENTS = 0
     AUX_FILE_NUMBER = 1
     BLOCK_SIZE = 0 # bytes
-    MAX_DOCUMENTS_DEFAULT = 1000
     accesos_disco_stoplist = 0
     accesos_disco_inverted_index = 0
     accesos_disco_DF = 0
@@ -53,32 +52,10 @@ class UBetterFixEverything():
             self.clean_directories()
         print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
         print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
-        if 0: #dataset_size > 1000: # more than a GB
-            pass
-            # print("El archivo es muy pesado, se realiza slicing para generar más archivos de menor tamaño.") # cada archivo de 55 MB aprox.
-            # exit_code_1 = os.system("split -b 53750k arxiv-metadata.json")
-            # exit_code_2 = os.system("cat xa* > arxiv-metadata.json")
-            # if not exit_code_1 and not exit_code_2: # successful
-            #     os.remove(data_path)
-            #     print("Slicing successfully")
-            #     lista_auxiliar = os.listdir(data_folder_path)
-            #     aprox_bloques_por_crear, aprox_block_size = self.approximation(os.path.getsize(data_folder_path + "/" + str(lista_auxiliar[0])))
-            #     print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
-            #     self.BLOCK_SIZE = self.MB_to_B(aprox_block_size/100) 
-            #     print("Actual block_size is: " + str(round(self.BLOCK_SIZE/1048576,3)) + " MB")
-            # else: # abort
-            #     print("Error, aborting slicing.")
-            #     lista_auxiliar = os.listdir(data_folder_path)
-            #     for file in lista_auxiliar:
-            #         if str(file) == str(data_path):
-            #             pass
-            #         else:
-            #             os.remove(data_folder_path + str(file))
-            #     print("Abort successfully")
-        else:
-            aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
-            print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
-            self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+        aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
+        print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) 
+        + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
+        self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
         
     def get_disk_accesses(self):
         print("Accesos a stoplist: " + str(self.accesos_disco_stoplist))
@@ -113,24 +90,12 @@ class UBetterFixEverything():
         return new_word.strip('-') # we remove them
 
 
-
-    def preprocesamiento(self, texto): # tokenization | Stopwords filter | Stemming
-
+    def preprocesamiento(self, texto, stoplist): # tokenization | Stopwords filter | Stemming
         # tokenizar
+
         palabras = nltk.word_tokenize(texto.lower())
 
-        # crear el stoplist
-        stoplist = []
-
         try:
-
-            with open(stoplist_path, encoding='latin-1') as f:
-                self.accesos_disco_stoplist += 1
-                for line in f:
-                    stoplist.append(line.strip())
-
-            stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
-            
             # filtrar stopwords
             palabras_limpias = []
             for token in palabras:
@@ -366,17 +331,25 @@ class UBetterFixEverything():
             print("Problem reading: " + final_inv_ind_filename + " path.")
             return 0
 
+    def load_stoplist(self, stoplist):
+        with open(stoplist_path, encoding='latin-1') as f:
+            self.accesos_disco_stoplist += 1
+            for line in f:
+                stoplist.append(line.strip())
+        f.close()
 
+        stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
+            
 
     def load(self, MAX):
-    # clean the files (or delete the directory) from previous iterations
-        # self.clean_directories()
-
+        stoplist = []
         print("Processing only a total of " + str(MAX) + " documents. (parameter specified)")
-
         local_inverted_index = {}
         documents_frequencies_list = []
         try:
+
+            self.load_stoplist(stoplist)
+
             with open(data_path, 'r') as f:
                 self.accesos_disco_data += 1
                 for line in f: # a line is a document
@@ -386,7 +359,7 @@ class UBetterFixEverything():
 
     # separate the attributes needed (the id and the abstract) // maybe also the title
                     doc_id = doc_object.get("id") 
-                    texto_procesado = self.preprocesamiento(doc_object.get("abstract"))
+                    texto_procesado = self.preprocesamiento(doc_object.get("abstract"), stoplist)
                     self.insert_document_into_local_inverted_index(local_inverted_index, texto_procesado, doc_id)
 
     # update the document_frequency
@@ -408,12 +381,9 @@ class UBetterFixEverything():
 
     # checking local_inverted_index size, if it exceeds the block size, we store it into an auxiliar file, else, we continue
     # we avoid doing the cheking after every word insertion to avoid a lot of computation and to handle the 'leftovers' from a document (the id's)
-                    self.check_block_size(local_inverted_index) # here the local_inverted_index is sent to disk and cleand or not
+                    self.check_block_size(local_inverted_index) # here the local_inverted_index is sent to disk and cleaned or not
 
                     self.NUMBER_OF_DOCUMENTS = self.NUMBER_OF_DOCUMENTS + 1
-                    # print("documents read: " + str(self.NUMBER_OF_DOCUMENTS))
-
-                    # print(self.NUMBER_OF_DOCUMENTS)
 
                     # STOPPER: JUST FOR TESTING
                     if self.NUMBER_OF_DOCUMENTS >= MAX:
@@ -422,8 +392,6 @@ class UBetterFixEverything():
             f.close()
     # uploading last block of document_frequencies
             self.upload_document_frequency_to_disk(documents_frequencies_list)
-            # for document_frequency in documents_frequencies_list:
-            #     self.upload_document_frequency_to_disk(document_frequency) 
             documents_frequencies_list.clear() 
 
     # check the last block (it probably has not exceed the BLOCK_SICE limits)
@@ -452,6 +420,9 @@ class UBetterFixEverything():
                 print("The files were successfully merged.")
             else:
                 print("Error merging the files.")
+
+            return stoplist
+
         except IOError:
             print("Problem reading: " + data_filename + " path.")
 
@@ -523,12 +494,12 @@ class UBetterFixEverything():
             print("Problem reading: " + data_filename + " path.")
 
 
-    def score(self, query, docs_to_read, k):
+    def score(self, query, docs_to_read, k, stoplist):
         if self.NUMBER_OF_DOCUMENTS == 0:
             print("No documents were found. (0 documents loaded)")
             return 0
         # process query
-        query = self.preprocesamiento(query)
+        query = self.preprocesamiento(query, stoplist)
         
         # some variables
         query_doc_frequency = {}
@@ -661,12 +632,12 @@ def main(docs_to_read, c, query, k):
     instance = UBetterFixEverything(c, docs_to_read)
 
     time1 = time.time()
-    instance.load(docs_to_read) 
+    stoplist = instance.load(docs_to_read) 
     time2 = time.time()
     print("Document loading took " + str(round((time2 - time1) * 1000)) + " ms.")
 
     time1 = time.time()
-    k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k)
+    k, docs_ids, scores, documents_retrieved = instance.score(query, docs_to_read, k, stoplist)
     time2 = time.time()
     print("Query processing, score similarity and fetching similar documents took " + str(round((time2 - time1) * 1000)) + " ms.")
 
@@ -681,7 +652,7 @@ def main(docs_to_read, c, query, k):
     return docs
 
 
-# main()
+# menu()
 
 # def result(query,topk):
 #     docs_to_read = 1000
