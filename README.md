@@ -44,14 +44,17 @@ class UBetterFixEverything():
 ```
 
 ### Función init
-EXPLICACION
+El constructor en primera instancia lo que hará es leer los stopwords de un archivo de texto.
 ```python
-def __init__(self, c, docs_to_read):
+def __init__(self, c):
 ```
 
 
 ### Función load
-EXPLICACION
+Esta función procesa todos los datos del json. Extrae todos los términos importantes evitando todos los stopwords de la lista dada y va generando índice para cada término el cual contiene todo los documentos científicos que lo contienen y su frecuencia respectiva. Estos diccionarios tienen un límite de tamaño, el cual si es superado pasa a memoria secundaria guardando en archivos secundarios y durante el procesamiento se va guardando la norma de estos términos.
+
+Finalmente  se realiza el merge de los archivos auxiliares creados que posteriormente elimina y finalmente este merge lo coloca en un Priority Queue. Estos datos dependiendo de los parámetros que inserte el usuario retornan los primeros k resultados más similares a una query. 
+
 ```python
 def load(self, MAX):
 ```
