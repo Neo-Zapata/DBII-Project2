@@ -53,7 +53,7 @@ def __init__(self, c):
 ### Función load
 Esta función procesa todos los datos del json. Extrae todos los términos importantes evitando todos los stopwords de la lista dada y va generando índice para cada término el cual contiene todo los documentos científicos que lo contienen y su frecuencia respectiva. Estos diccionarios tienen un límite de tamaño, el cual si es superado pasa a memoria secundaria guardando en archivos secundarios y durante el procesamiento se va guardando la norma de estos términos.
 
-Finalmente  se realiza el merge de los archivos auxiliares creados que posteriormente elimina y finalmente este merge lo coloca en un Priority Queue. Estos datos dependiendo de los parámetros que inserte el usuario retornan los primeros k resultados más similares a una query. 
+Finalmente  se realiza el merge de los archivos auxiliares creados que posteriormente elimina y finalmente este merge lo coloca en un Priority Queue. Estos datos dependiendo de los parámetros que inserte el usuario posteriormente nos serán útiles para retornar los primeros k resultados más similares a una query. 
 
 ```python
 def load(self, MAX):
@@ -71,10 +71,6 @@ Finalmente esta función retorna solo los k documentos más parecidos a la query
 def retrieve(self, k, docs_ids, scores, documents_retrieved):
 ```
 
-
-
-
-EXPLICACIÓN DE FUNCIONES
 
 # Frontend
 Para el frontend se utilizó html y bootstrap. También se utilizó el motor de plantillas de jinja2 para poder manejar la cantidad de documentos similares a la consulta del usuario. 
