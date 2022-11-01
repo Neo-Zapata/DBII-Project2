@@ -5,10 +5,10 @@
 * Harold Canto Vidal
 * Christian Rojas Rojas
 * Eros Carhuancho Espejo
-# Objetivo:
-El objetivo del proyecto es crear un motor de búsqueda que a partir de una query textual podamos buscar los artículos académicos de nuestra base de datos que más se asemejan a esta, rankeando los resultados mediante un score. Este proceso se dará aplicando los conceptos aprendidos en clase como el índice invertido, la similitud de cosenos, la normalización de términos, etc. Posteriormente mediremos el tiempo que tarda esta filtración de información aplicada con Python y lo compararemos con el tiempo que tarda hacerlo con postgres.  
+
 
 # Tabla de contenido
+- [Objetivo](#Objetivo)
 - [Backend](#Backend)
   * [Dataset](#Dataset)
   * [Inverted index](#Inverted-index)
@@ -19,6 +19,10 @@ El objetivo del proyecto es crear un motor de búsqueda que a partir de una quer
     + [Función retrieve](#Función-retrieve)
 - [Frontend](#Frontend)
   * [Comparativa de Python y Postgres](#Comparativa-de-Python-y-Postgres)
+
+
+# Objetivo:
+El objetivo del proyecto es crear un motor de búsqueda que a partir de una query textual podamos buscar los artículos académicos de nuestra base de datos que más se asemejan a esta, rankeando los resultados mediante un score. Este proceso se dará aplicando los conceptos aprendidos en clase como el índice invertido, la similitud de cosenos, la normalización de términos, etc. Posteriormente mediremos el tiempo que tarda esta filtración de información aplicada con Python y lo compararemos con el tiempo que tarda hacerlo con postgres.  
 
 # Backend
 
@@ -48,6 +52,7 @@ Sin embargo, la data más relevante correspone de la columna "id" y "abstract" q
 Es un método para estructurar la información más importante de un texto completo. La composición se da mediante un documento el cual tiene términos con una determinada frecuencia. En el caso del proyecto la información de la base de datos es organizada para retornar datos de una forma rápida y óptima. La consulta enviada también se procesa y organiza de la misma manera, posteriormente se genera un score de similitud con todos los documentos de la base de datos antes descritos. Finalmente se devuelven los documentos con mayor score los cuales se consideran más importantes.
 
 ## Funciones importantes
+A continuación explicaremos brevemente las funciones más importantes de nuestra implementación.
 
 ### Clase principal
 Es una clase que contiene todas las funciones necesarias para procesar la query y todos los artículos académicos de forma eficiente.
