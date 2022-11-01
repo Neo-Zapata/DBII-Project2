@@ -96,6 +96,6 @@ Para el frontend se utilizó html y bootstrap. También se utilizó el motor de 
 Las imágenes muestran los resultados de una consulta con la implementación de python y postgres con sus respectivos tiempos de ejecución.
 
 
-FALTA IMAGENES COMPARATIVAS
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado.png)
 
 
