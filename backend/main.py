@@ -807,7 +807,7 @@ def postgres_search(query, k):
 
 
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="styles")
 
 
 

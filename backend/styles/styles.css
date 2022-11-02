@@ -1,0 +1,37 @@
+body {
+    padding: 20px;
+    background-color: rgb(235, 231, 211);
+}
+
+
+div {
+    background-color: white;
+}
+
+.header{
+    margin-top: 20px;
+    background-color: rgb(235, 231, 211);
+}
+
+.gits{
+    background-color: rgb(235, 231, 211);
+    display: flex;
+    justify-content: center;
+}
+
+.gits h3{
+    margin: 0 25px;
+}
+
+.container .col-sm{
+    background-color: rgb(235, 231, 211);
+}
+
+.v-line{
+    background-color: rgb(235, 231, 211);
+    border-left: thick solid #000;
+    height:100%;
+    width: .5px;
+    left: 49%;
+    position: absolute;
+}
