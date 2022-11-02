@@ -48,6 +48,7 @@ class UBetterFixEverything():
     accesos_disco_data = 0
     accesos_a_norm_doc_for_normalization = 0
     accesos_getlines_from_inv_ind = 0
+    FACTOR = 1
     stoplist = []
     docs_ids = []
 
@@ -59,8 +60,8 @@ class UBetterFixEverything():
         self.load_stoplist()
 
         # print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
-        # print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
-        # aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
+        # print("Los documentos escogidos a cargar pesan: " + str(self.docs_to_read*2.44*0.001) + " MB")
+        # aprox_bloques_por_crear, aprox_block_size = self.approximation(self.docs_to_read)
         # print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) 
         # + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
         # self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
@@ -186,8 +187,9 @@ class UBetterFixEverything():
 
 
     def check_block_size(self, local_inverted_index):
-        size = self.get_size(local_inverted_index)
-        if size >= self.BLOCK_SIZE:
+        # size = self.get_size(local_inverted_index)
+        if self.NUMBER_OF_DOCUMENTS >= self.BLOCK_SIZE*self.FACTOR:
+            self.FACTOR += 1
             print("uploading block " + str(self.AUX_FILE_NUMBER) + " to disk...")
             if(self.upload_block_to_disk(local_inverted_index)):
                 print("block " + str(self.AUX_FILE_NUMBER) + " successfully uploaded.")
@@ -470,7 +472,7 @@ class UBetterFixEverything():
                     break
 
 
-    def tf_idf_weight_and_cosine_score(self, scores, query_keyword_inv_ind, query_doc_frequency):
+    def tf_idf_weight_and_cosine_score(self, scores, query_keyword_inv_ind, query_doc_frequency): # SLOWEST OPERATION 
         for keyword in query_keyword_inv_ind:
             query_tf_idf_weight = math.log(query_doc_frequency[keyword] + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
             for doc_id, frequency in query_keyword_inv_ind[keyword]["doc-ids"]:
@@ -674,7 +676,8 @@ def search(instance, docs_to_read, c, query, k):
 def load_data(instance, docs_to_read):
     
     aprox_bloques_por_crear, aprox_block_size = instance.approximation(docs_to_read)   
-    instance.BLOCK_SIZE = instance.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+    # instance.BLOCK_SIZE = instance.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+    instance.BLOCK_SIZE = 7500
 
     print(instance.BLOCK_SIZE)
 
