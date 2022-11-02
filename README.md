@@ -8,6 +8,7 @@
 
 
 # Tabla de contenido
+- [Cuadro de Actividades](#Cuadro-de-Actividades)
 - [Objetivo](#Objetivo)
 - [Backend](#Backend)
   * [Dataset](#Dataset)
@@ -21,8 +22,49 @@
   * [Comparativa de Python y Postgres](#Comparativa-de-Python-y-Postgres)
 
 
+# Cuadro de Actividades:
+
+<table>
+  <tbody>
+    <tr>
+      <th>Lista de actividades realizadas</th>
+      <th align="center">Responsable</th>
+    </tr>
+    <tr>
+      <td>Implementación de la función init </td>
+      <td align="center">Harold Canto Vidal</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función load</td>
+      <td align="center">Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función score</td>
+      <td align="center">Christian Rojas Rojas y Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función retrieve</td>
+      <td align="center">Harold Canto Vidal y Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función preprocesamiento</td>
+      <td align="center">Christian Rojas Rojas </td>
+    </tr>
+    <tr>
+      <td>Implementación del Frontend</td>
+      <td align="center">Eros Carhuancho</td>
+    </tr>
+    <tr>
+      <td>Escritura del informe</td>
+      <td align="center">Eros Carhuancho</td>
+    </tr>
+  </tbody>
+</table>
+
 # Objetivo:
 El objetivo del proyecto es crear un motor de búsqueda que a partir de una query textual podamos buscar los artículos académicos de nuestra base de datos que más se asemejan a esta, rankeando los resultados mediante un score. Este proceso se dará aplicando los conceptos aprendidos en clase como el índice invertido, la similitud de cosenos, la normalización de términos, etc. Posteriormente mediremos el tiempo que tarda esta filtración de información aplicada con Python y lo compararemos con el tiempo que tarda hacerlo con postgres.  
+
+
 
 # Backend
 
