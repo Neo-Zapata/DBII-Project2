@@ -9,6 +9,7 @@
 
 # Tabla de contenido
 - [Cuadro de Actividades](#Cuadro-de-Actividades)
+- [Cuadro de Participación](#Cuadro-de-Participación)
 - [Objetivo](#Objetivo)
 - [Backend](#Backend)
   * [Dataset](#Dataset)
@@ -57,6 +58,34 @@
     <tr>
       <td>Escritura del informe</td>
       <td align="center">Eros Carhuancho</td>
+    </tr>
+  </tbody>
+</table>
+
+
+# Cuadro de Participación:
+
+<table>
+  <tbody>
+    <tr>
+      <th>Integrantes</th>
+      <th align="center">Participación</th>
+    </tr>
+    <tr>
+      <td>Neo Marcelo Zapata Gallegos</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Harold Canto Vidal</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Christian Rojas Rojas</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Eros Carhuancho Espejo</td>
+      <td align="center">100%</td>
     </tr>
   </tbody>
 </table>
