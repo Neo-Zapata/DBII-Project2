@@ -21,6 +21,7 @@
     + [Función retrieve](#Función-retrieve)
 - [Frontend](#Frontend)
   * [Comparativa de Python y Postgres](#Comparativa-de-Python-y-Postgres)
+  * [Comparación de tiempo](#Comparación-de-tiempo)
 
 
 # Cuadro de Actividades:
@@ -169,4 +170,9 @@ Las imágenes muestran los resultados de una consulta con la implementación de 
 
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado.png)
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado2.png)
+
+
+
+## Comparación de tiempo
+
 
