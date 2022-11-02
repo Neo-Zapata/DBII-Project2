@@ -200,7 +200,7 @@ We construct a model of the CO remnant that\nmimics the results of the SPH simul
 500 000 datos con 1891505 accesos a memoria
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem500.jpeg)
 
-1 000 000 datos con 1891505 accesos a memoria
+1 000 000 datos con 3980775 accesos a memoria
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem1000.jpeg)
 
 Posteriormente a esto guardaremos los datos de tiempo y cantidad de datos, esto nos ayudará a ver una comparativa entre el índice invertido en python y el de GIN de postgres.
