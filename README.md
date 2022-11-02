@@ -8,6 +8,8 @@
 
 
 # Tabla de contenido
+- [Cuadro de Actividades](#Cuadro-de-Actividades)
+- [Cuadro de Participación](#Cuadro-de-Participación)
 - [Objetivo](#Objetivo)
 - [Backend](#Backend)
   * [Dataset](#Dataset)
@@ -19,10 +21,80 @@
     + [Función retrieve](#Función-retrieve)
 - [Frontend](#Frontend)
   * [Comparativa de Python y Postgres](#Comparativa-de-Python-y-Postgres)
+  * [Comparación de tiempo](#Comparación-de-tiempo)
 
+
+# Cuadro de Actividades:
+
+<table>
+  <tbody>
+    <tr>
+      <th>Lista de actividades realizadas</th>
+      <th align="center">Responsable</th>
+    </tr>
+    <tr>
+      <td>Implementación de la función init </td>
+      <td align="center">Harold Canto Vidal</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función load</td>
+      <td align="center">Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función score</td>
+      <td align="center">Christian Rojas Rojas y Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función retrieve</td>
+      <td align="center">Harold Canto Vidal y Neo Marcelo Zapata Gallegos</td>
+    </tr>
+    <tr>
+      <td>Implementación de la función preprocesamiento</td>
+      <td align="center">Christian Rojas Rojas </td>
+    </tr>
+    <tr>
+      <td>Implementación del Frontend</td>
+      <td align="center">Eros Carhuancho</td>
+    </tr>
+    <tr>
+      <td>Escritura del informe</td>
+      <td align="center">Eros Carhuancho</td>
+    </tr>
+  </tbody>
+</table>
+
+
+# Cuadro de Participación:
+
+<table>
+  <tbody>
+    <tr>
+      <th>Integrantes</th>
+      <th align="center">Participación</th>
+    </tr>
+    <tr>
+      <td>Neo Marcelo Zapata Gallegos</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Harold Canto Vidal</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Christian Rojas Rojas</td>
+      <td align="center">100%</td>
+    </tr>
+    <tr>
+      <td>Eros Carhuancho Espejo</td>
+      <td align="center">100%</td>
+    </tr>
+  </tbody>
+</table>
 
 # Objetivo:
 El objetivo del proyecto es crear un motor de búsqueda que a partir de una query textual podamos buscar los artículos académicos de nuestra base de datos que más se asemejan a esta, rankeando los resultados mediante un score. Este proceso se dará aplicando los conceptos aprendidos en clase como el índice invertido, la similitud de cosenos, la normalización de términos, etc. Posteriormente mediremos el tiempo que tarda esta filtración de información aplicada con Python y lo compararemos con el tiempo que tarda hacerlo con postgres.  
+
+
 
 # Backend
 
@@ -99,3 +171,6 @@ Las imágenes muestran los resultados de una consulta con la implementación de 
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado.png)
 ![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado2.png)
 
+
+
+## Comparación de tiempo
