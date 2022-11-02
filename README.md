@@ -168,8 +168,8 @@ Para el frontend se utilizó html y bootstrap. También se utilizó el motor de 
 Las imágenes muestran los resultados de una consulta con la implementación de python y postgres con sus respectivos tiempos de ejecución.
 
 
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado.png)
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado2.png)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/Resultado.png)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/Resultado2.png)
 
 
 
@@ -180,28 +180,31 @@ Para esta sección nos apoyamos de las variables que usamos en nuestra clase de 
 We construct a model of the CO remnant that\nmimics the results of the SPH simulation using a one-dimensional hydrodynamic\nstellar evolution code and then follow its secular evolution. The stellar\nevolution models indicate that the growth of the cold core is controlled by\nneutrino cooling at the interface between the core and the hot envelope, and\nthat carbon ignition in the envelope can be avoided despite high effective\naccretion rates. This result suggests that the assumption of forced accretion\nof cold matter that was adopted in previous studies of the evolution of double\nCO white dwarf merger remnants may not be appropriate. Our results imply that\nat least some products of double CO white dwarfs merger may be considered good\ncandidates for the progenitors of Type Ia supernovae. In this case, the\ncharacteristic time delay between the initial dynamical merger and the eventual\nexplosion would be ~10^5 yr. (Abridged).
 
 10 000 datos con 40292 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem10.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem10.jpeg)
 
 25 000 datos con 82171 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem25.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem25.jpeg)
 
 50 000 datos con 178952 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem50.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem50.jpeg)
 
 150 000 datos con 536261 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem150.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem150.jpeg)
 
 200 000 datos con 724858 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem200.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem200.jpeg)
 
 250 000 datos con 915224 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem250.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem250.jpeg)
 
 500 000 datos con 1891505 accesos a memoria
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/exp_mem500.jpeg)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem500.jpeg)
+
+1 000 000 datos con 1891505 accesos a memoria
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/exp_mem1000.jpeg)
 
 Posteriormente a esto guardaremos los datos de tiempo y cantidad de datos, esto nos ayudará a ver una comparativa entre el índice invertido en python y el de GIN de postgres.
 
-![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/Resultado3.PNG)
+![Image text](https://github.com/Neo-Zapata/DBII-Project2/blob/main/images/Resultado3.PNG)
 
 Para la creación de la gráfica usamos el logaritmo de los valores para tener un gráfico más apreciable. Finalmente podemos notar que, para el query analizado, el índice invertido realizado en python es mejor para datos pequeños, pasada una cantidad de datos de 90 000 aproximadamente (inflexión), el indice GIN de postgres empieza a tener un mejor rendimiento en adelante.
