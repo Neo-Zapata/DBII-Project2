@@ -1,8 +1,11 @@
 import json
+import time
+import psycopg2
 import linecache as lc
 from operator import index
 import os
 import io
+from flask import Flask, render_template, request, redirect, url_for
 from re import A
 import sys
 from queue import PriorityQueue
@@ -38,43 +41,43 @@ class UBetterFixEverything():
     NUMBER_OF_DOCUMENTS = 0
     AUX_FILE_NUMBER = 1
     BLOCK_SIZE = 0 # bytes
-    MAX_DOCUMENTS_DEFAULT = 1000
+    accesos_disco_stoplist = 0
+    accesos_disco_inverted_index = 0
+    accesos_disco_DF = 0
+    accesos_disco_merging = 0
+    accesos_disco_data = 0
+    accesos_a_norm_doc_for_normalization = 0
+    accesos_getlines_from_inv_ind = 0
+    stoplist = []
+    docs_ids = []
 
-    def __init__(self):
-        self.clean_directories()
-        print("El dataset pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
-        if 0: #dataset_size > 1000: # more than a GB
-            pass
-            # print("El archivo es muy pesado, se realiza slicing para generar más archivos de menor tamaño.") # cada archivo de 55 MB aprox.
-            # exit_code_1 = os.system("split -b 53750k arxiv-metadata.json")
-            # exit_code_2 = os.system("cat xa* > arxiv-metadata.json")
-            # if not exit_code_1 and not exit_code_2: # successful
-            #     os.remove(data_path)
-            #     print("Slicing successfully")
-            #     lista_auxiliar = os.listdir(data_folder_path)
-            #     aprox_bloques_por_crear, aprox_block_size = self.approximation(os.path.getsize(data_folder_path + "/" + str(lista_auxiliar[0])))
-            #     print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
-            #     self.BLOCK_SIZE = self.MB_to_B(aprox_block_size/100) 
-            #     print("Actual block_size is: " + str(round(self.BLOCK_SIZE/1048576,3)) + " MB")
-            # else: # abort
-            #     print("Error, aborting slicing.")
-            #     lista_auxiliar = os.listdir(data_folder_path)
-            #     for file in lista_auxiliar:
-            #         if str(file) == str(data_path):
-            #             pass
-            #         else:
-            #             os.remove(data_folder_path + str(file))
-            #     print("Abort successfully")
-        else:
-            aprox_bloques_por_crear, aprox_block_size = self.approximation(datafile_size)
-            print("Se calcula la creación de aproximadamente " + str(round(aprox_bloques_por_crear,3)) + " archivos (bloques), con un block_size de " + str(round(aprox_block_size,3)) + " MB cada uno")
-            self.BLOCK_SIZE = self.MB_to_B(math.log(aprox_block_size,10)) # to reduce the scale according to the approximation from the file size
-            print("Actual block_size is: " + str(self.B_to_MB(self.BLOCK_SIZE)) + " MB")
+    def __init__(self, c):#, docs_to_read):
+
+        if c == "Yes":
+            self.clean_directories()
+
+        self.load_stoplist()
+
+        # print("El dataset completo pesa: " + str(self.B_to_MB(datafile_size)) + " MB") # MB
+        # print("Los documentos escogidos a cargar pesan: " + str(docs_to_read*2.44*0.001) + " MB")
+        # aprox_bloques_por_crear, aprox_block_size = self.approximation(docs_to_read)
+        # print("Se calcula la creación de aproximadamente " + str(aprox_bloques_por_crear) 
+        # + " archivos (bloques), con un block_size de " + str(aprox_block_size) + " MB cada uno")
+        # self.BLOCK_SIZE = self.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
         
+    def get_disk_accesses(self):
+        print("Accesos a stoplist: " + str(self.accesos_disco_stoplist))
+        print("Accesos a los indices invertidos temporales: " + str(self.accesos_disco_inverted_index))
+        print("Accesos a final_inverted_index: " + str(self.accesos_disco_merging + self.accesos_getlines_from_inv_ind))
+        print("Accesos a dataset file: " + str(self.accesos_disco_data))
+        print("Accesos al documento de normas: " + str(self.accesos_a_norm_doc_for_normalization + self.accesos_disco_DF))
+        return (self.accesos_disco_stoplist + self.accesos_disco_inverted_index + self.accesos_disco_DF + self.accesos_disco_merging + self.accesos_disco_data + self.accesos_a_norm_doc_for_normalization + self.accesos_getlines_from_inv_ind)
 
-    def approximation(self, datafile_size):
-        aprox_bloques_por_crear = math.log(datafile_size, 2)
-        aprox_block_size = self.B_to_MB((datafile_size / aprox_bloques_por_crear)) # MB
+    def approximation(self, docs_to_read):
+        aprox_bloques_por_crear = round(math.log(docs_to_read, 2),3)
+        # Se aproxima de distintas fuentes que un documento pesa aproximadamente 2.44 KB, entonces: (1KB = 0.001MB)
+        aprox_block_size = round((docs_to_read / aprox_bloques_por_crear)*2.44*0.001,5) # This is a conversion from KB to MB
+
         return aprox_bloques_por_crear, aprox_block_size
 
     def MB_to_B(self, MB):
@@ -94,27 +97,16 @@ class UBetterFixEverything():
         return new_word.strip('-') # we remove them
 
 
-
     def preprocesamiento(self, texto): # tokenization | Stopwords filter | Stemming
-
         # tokenizar
+
         palabras = nltk.word_tokenize(texto.lower())
 
-        # crear el stoplist
-        stoplist = []
-
         try:
-
-            with open(stoplist_path, encoding='latin-1') as f:
-                for line in f:
-                    stoplist.append(line.strip())
-
-            stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
-            
             # filtrar stopwords
             palabras_limpias = []
             for token in palabras:
-                if token not in stoplist:
+                if token not in self.stoplist:
                     palabras_limpias.append(token)
 
             # process each clean word
@@ -177,7 +169,10 @@ class UBetterFixEverything():
         # sent
         sorted_keys = sorted(local_inverted_index.keys())
         try:
+            if not os.path.exists(cwd + "/documents/inverted_index"):
+                os.makedirs(cwd + "/documents/inverted_index")
             with open(inv_ind_path + str(self.AUX_FILE_NUMBER) + ".json", 'a', encoding = "utf-8") as inv_ind_file:
+                self.accesos_disco_inverted_index += 1
                 for keyword in sorted_keys:
                     inv_ind_file.write(json.dumps({keyword: local_inverted_index[keyword]}, ensure_ascii = False))
                     inv_ind_file.write("\n")
@@ -211,11 +206,15 @@ class UBetterFixEverything():
         return json_object
 
 
-    def upload_document_frequency_to_disk(self, document_frequency):
+    def upload_document_frequency_to_disk(self, documents_frequencies_list):
         try:
+            if not os.path.exists(cwd + "/documents/norm_doc"):
+                os.makedirs(cwd + "/documents/norm_doc")
             with open(norm_doc_path, 'a', encoding = "utf-8") as norm_file:
-                norm_file.write(document_frequency)
-                norm_file.write("\n")
+                self.accesos_disco_DF += 1
+                for document_frequency in documents_frequencies_list:
+                    norm_file.write(document_frequency)
+                    norm_file.write("\n")
             norm_file.close()
         except IOError:
             print("Problem reading: " + norm_doc_filename + " path.")
@@ -224,6 +223,20 @@ class UBetterFixEverything():
 
 
     def clean_directories(self):
+        self.terminos_procesados = 0
+        self.NUMBER_OF_DOCUMENTS = 0
+        self.AUX_FILE_NUMBER = 1
+        self.BLOCK_SIZE = 0 # bytes
+        self.accesos_disco_stoplist = 0
+        self.accesos_disco_inverted_index = 0
+        self.accesos_disco_DF = 0
+        self.accesos_disco_merging = 0
+        self.accesos_disco_data = 0
+        self.accesos_a_norm_doc_for_normalization = 0
+        self.accesos_getlines_from_inv_ind = 0
+        self.stoplist = []
+        self.docs_ids = []
+        
         clean_dir_1 = os.listdir(path_to_clean_1) # archivos de normas
         clean_dir_2 = os.listdir(path_to_clean_2) # archivo de indices invertidos
         clean_dir_3 = os.listdir(path_to_clean_3) # archivo con el final inverted index
@@ -239,6 +252,7 @@ class UBetterFixEverything():
     def initialize_list_of_buffers(self, buffers, active_files_index, priority_queue, buffers_line_number):
         for i in range(self.AUX_FILE_NUMBER):
             inv_ind = lc.getline(inv_ind_path + str(i+1) + ".json", 1).rstrip() # get first line from the auxiliar file. which is the keywords and a posting list of all the documents it appears, along with the document frequency of each document.
+            self.accesos_getlines_from_inv_ind += 1
             if inv_ind != "":
                 json_object = json.load(io.StringIO(inv_ind)) # load json object
                 key = list(json_object.keys()) # get keywords from the json object
@@ -256,61 +270,82 @@ class UBetterFixEverything():
     def merge(self, buffers, active_files_index, priority_queue, buffers_line_number):
         aux_list = []
         try:
-            with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
+            while not priority_queue.empty():
+                temp_inv_ind = {} # to store the new inverted_index keyword (but complete)
+                keyword, index_file = priority_queue.get() 
+                temp_inv_ind["keyword"] = keyword
+                temp_inv_ind["IDF"] = 0 # temporal inverted document frequency
+                temp_inv_ind["doc-ids"] = [] # list of doc id's
+
+                if buffers[index_file][0] == temp_inv_ind["keyword"]:
+                    for posting_list in buffers[index_file][1]: # getting the posting list
+                        temp_inv_ind["doc-ids"].append(posting_list)
+# replace the buffer read
+                    inv_ind = lc.getline(inv_ind_path + str(index_file+1) + ".json", buffers_line_number[index_file]).rstrip()
+                    self.accesos_getlines_from_inv_ind += 1 
+                    buffers_line_number[index_file] = buffers_line_number[index_file] + 1
+                    if inv_ind == "": # end of the file has been reached
+                        active_files_index.remove(index_file)
+                        os.remove(inv_ind_path + str(index_file+1) + ".json")
+                    else:
+                        json_object = json.load(io.StringIO(inv_ind)) # load json object
+                        key = list(json_object.keys()) # get keywords from the json object
+                        buffers[index_file] = [key[0], list(json_object.get(key[0]).items())] # list of keyword and its posting lists
+                        priority_queue.put((buffers[index_file][0], index_file)) # add next keyword to priority queue from document
+                else:
+                    print("ERROR DE MAGNITUD DESPROPORCIONADA!")
 
                 while not priority_queue.empty():
-                    temp_inv_ind = {} # to store the new inverted_index keyword (but complete)
-                    keyword, index_file = priority_queue.get() 
-                    temp_inv_ind["keyword"] = keyword
-                    temp_inv_ind["IDF"] = 0 # temporal inverted document frequency
-                    temp_inv_ind["doc-ids"] = [] # list of doc id's
-
-                    if buffers[index_file][0] == temp_inv_ind["keyword"]:
-                        for posting_list in buffers[index_file][1]: # getting the posting list
-                            temp_inv_ind["doc-ids"].append(posting_list)
-    # replace the buffer read
-                        inv_ind = lc.getline(inv_ind_path + str(index_file+1) + ".json", buffers_line_number[index_file]).rstrip() 
-                        buffers_line_number[index_file] = buffers_line_number[index_file] + 1
+                    other_keyword, other_index_file = priority_queue.get()
+                    if other_keyword == keyword:
+                        for posting_list in buffers[other_index_file][1]: # getting the posting list
+                            temp_inv_ind["doc-ids"].append(posting_list) 
+# replace the buffer read
+                        inv_ind = lc.getline(inv_ind_path + str(other_index_file+1) + ".json", buffers_line_number[other_index_file]).rstrip() 
+                        self.accesos_getlines_from_inv_ind += 1
+                        buffers_line_number[other_index_file] = buffers_line_number[other_index_file] + 1
                         if inv_ind == "": # end of the file has been reached
-                            active_files_index.remove(index_file)
-                            os.remove(inv_ind_path + str(index_file+1) + ".json")
+                            active_files_index.remove(other_index_file)
+                            os.remove(inv_ind_path + str(other_index_file+1) + ".json")
                         else:
                             json_object = json.load(io.StringIO(inv_ind)) # load json object
                             key = list(json_object.keys()) # get keywords from the json object
-                            buffers[index_file] = [key[0], list(json_object.get(key[0]).items())] # list of keyword and its posting lists
-                            priority_queue.put((buffers[index_file][0], index_file)) # add next keyword to priority queue from document
+                            buffers[other_index_file] = [key[0], list(json_object.get(key[0]).items())] # list of keyword and its posting lists
+                            priority_queue.put((buffers[other_index_file][0], other_index_file)) # add next keyword to priority queue from document
                     else:
-                        print("ERROR DE MAGNITUD DESPROPORCIONADA!")
+                        # print("Se acabo el keyword " + str(keyword) + ", ahora estamos en " + str(other_keyword))
+                        priority_queue.put((other_keyword, other_index_file))
+                        break
 
-                    while not priority_queue.empty():
-                        other_keyword, other_index_file = priority_queue.get()
-                        if other_keyword == keyword:
-                            for posting_list in buffers[other_index_file][1]: # getting the posting list
-                                temp_inv_ind["doc-ids"].append(posting_list) 
-    # replace the buffer read
-                            inv_ind = lc.getline(inv_ind_path + str(other_index_file+1) + ".json", buffers_line_number[other_index_file]).rstrip() 
-                            buffers_line_number[other_index_file] = buffers_line_number[other_index_file] + 1
-                            if inv_ind == "": # end of the file has been reached
-                                active_files_index.remove(other_index_file)
-                                os.remove(inv_ind_path + str(other_index_file+1) + ".json")
-                            else:
-                                json_object = json.load(io.StringIO(inv_ind)) # load json object
-                                key = list(json_object.keys()) # get keywords from the json object
-                                buffers[other_index_file] = [key[0], list(json_object.get(key[0]).items())] # list of keyword and its posting lists
-                                priority_queue.put((buffers[other_index_file][0], other_index_file)) # add next keyword to priority queue from document
-                        else:
-                            # print("Se acabo el keyword " + str(keyword) + ", ahora estamos en " + str(other_keyword))
-                            priority_queue.put((other_keyword, other_index_file))
-                            break;
+        # at this point, 1 keyword has been succesfully processed (it means we have the complete posting lists for that keyword)
+        # to avoid many accesses to disk, we store it into a list and when it reaches a specific size, we upload it to disk (as a block)
 
-            # at this point, 1 keyword has been succesfully processed (it means we have the complete posting lists for that keyword)
-            # to avoid many accesses to disk, we store it into a list and when it reaches a specific size, we upload it to disk (as a block)
+                temp_inv_ind["IDF"] = round(math.log(self.NUMBER_OF_DOCUMENTS/len(temp_inv_ind["doc-ids"]), 10), 5) # log_10(number_documents / document frequency)
+            
+                aux_list.append(temp_inv_ind)
+                
+                if len(aux_list) > 1000: # procesamos de 1000 en 1000   
+                    if not os.path.exists(cwd + "/documents/final_inverted_index"):
+                        os.makedirs(cwd + "/documents/final_inverted_index")                
+                    with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
+                        self.accesos_disco_merging += 1
+                        for inv_ind in aux_list:
+                            final_inv_ind.write(json.dumps(inv_ind, ensure_ascii=False)) # write to file
+                            final_inv_ind.write("\n")
+                            self.terminos_procesados = self.terminos_procesados + 1 # number of terms processed + 1
+                        aux_list.clear()
+                    final_inv_ind.close()
 
-                    temp_inv_ind["IDF"] = round(math.log(self.NUMBER_OF_DOCUMENTS/len(temp_inv_ind["doc-ids"]), 10), 5) # log_10(number_documents / document frequency)
-                    # for inv_ind in aux_list:
-                    final_inv_ind.write(json.dumps(temp_inv_ind, ensure_ascii=False)) # write to file
+        # upload last block of merged terms
+            if not os.path.exists(cwd + "/documents/final_inverted_index"):
+                os.makedirs(cwd + "/documents/final_inverted_index")
+            with open(final_inv_ind_path, 'a', encoding="utf-8") as final_inv_ind:
+                self.accesos_disco_merging += 1
+                for inv_ind in aux_list:
+                    final_inv_ind.write(json.dumps(inv_ind, ensure_ascii=False)) # write to file
                     final_inv_ind.write("\n")
                     self.terminos_procesados = self.terminos_procesados + 1 # number of terms processed + 1
+                aux_list.clear()
             final_inv_ind.close()
 
             print("Se procesaron " + str(self.terminos_procesados) + " terminos, en un total de " + str(self.NUMBER_OF_DOCUMENTS) + " documentos")
@@ -320,18 +355,29 @@ class UBetterFixEverything():
             print("Problem reading: " + final_inv_ind_filename + " path.")
             return 0
 
+    def load_stoplist(self):
+        with open(stoplist_path, encoding='latin-1') as f:
+            self.accesos_disco_stoplist += 1
+            for line in f:
+                self.stoplist.append(line.strip())
+        f.close()
 
+        self.stoplist += [',', '!', '.', '?', '-', ';','"','¿',')','(','[',']','>>','<<','\'\'','``', '%', '$','_','-','{','}',"'"]
+            
 
-    def load(self, MAX = 5000):
-    # clean the files (or delete the directory) from previous iterations
-        # self.clean_directories()
-
+    def load(self, MAX):
+        # stoplist = []
+        counter = 0
+        factor = 1             
         print("Processing only a total of " + str(MAX) + " documents. (parameter specified)")
-
         local_inverted_index = {}
         documents_frequencies_list = []
         try:
+
+            # self.load_stoplist(stoplist)
+
             with open(data_path, 'r') as f:
+                self.accesos_disco_data += 1
                 for line in f: # a line is a document
                     document_frequency = {}
                     line = line.rstrip()
@@ -350,26 +396,34 @@ class UBetterFixEverything():
                             document_frequency[token] = 1
 
     # insert into documents_frequencies_list, we do this to avoid accessing to disk each time a document is read, instead we send a block of frequency documents
+                    blocks_for_DF = int(math.log(MAX, 2))
                     document_frequency = self.process_document_frequency(document_frequency, doc_id)
-                    # documents_frequencies_list.append(document_frequency)
-                    # if self.get_size(documents_frequencies_list) >= self.BLOCK_SIZE:
-                    #     for document_frequency in documents_frequencies_list:
-                    self.upload_document_frequency_to_disk(document_frequency)  
+                    documents_frequencies_list.append(document_frequency)
+                    if len(documents_frequencies_list) >= MAX/blocks_for_DF:
+                        self.upload_document_frequency_to_disk(documents_frequencies_list)
+                        # for document_frequency in documents_frequencies_list:
+                        #     self.upload_document_frequency_to_disk(document_frequency) 
+                        documents_frequencies_list.clear() 
 
     # checking local_inverted_index size, if it exceeds the block size, we store it into an auxiliar file, else, we continue
     # we avoid doing the cheking after every word insertion to avoid a lot of computation and to handle the 'leftovers' from a document (the id's)
-                    self.check_block_size(local_inverted_index) # here the local_inverted_index is sent to disk and cleand or not
+                    self.check_block_size(local_inverted_index) # here the local_inverted_index is sent to disk and cleaned or not
 
                     self.NUMBER_OF_DOCUMENTS = self.NUMBER_OF_DOCUMENTS + 1
-                    # print("documents read: " + str(self.NUMBER_OF_DOCUMENTS))
+                    counter += 1
 
-                    # print(self.NUMBER_OF_DOCUMENTS)
-
+                    if counter > 1000*factor:
+                        print(counter)
+                        factor += 1
                     # STOPPER: JUST FOR TESTING
                     if self.NUMBER_OF_DOCUMENTS >= MAX:
                         break
 
             f.close()
+    # uploading last block of document_frequencies
+            self.upload_document_frequency_to_disk(documents_frequencies_list)
+            documents_frequencies_list.clear() 
+
     # check the last block (it probably has not exceed the BLOCK_SICE limits)
             size = self.get_size(local_inverted_index)
             if size > 0:
@@ -396,6 +450,9 @@ class UBetterFixEverything():
                 print("The files were successfully merged.")
             else:
                 print("Error merging the files.")
+
+            # return stoplist
+
         except IOError:
             print("Problem reading: " + data_filename + " path.")
 
@@ -407,6 +464,7 @@ class UBetterFixEverything():
             while low <= high:
                 mid = (low + high) // 2
                 candidate = lc.getline(final_inv_ind_path, mid).rstrip()
+                self.accesos_getlines_from_inv_ind += 1
                 candidate_json = json.load(io.StringIO(candidate))
                 token = candidate_json.get("keyword") # get token from the line read
                 if token < keyword:
@@ -418,26 +476,29 @@ class UBetterFixEverything():
                     break
 
 
-    def tf_idf_weight_and_cosine_score(self, docs_ids, scores, query_keyword_inv_ind, query_doc_frequency):
+    def tf_idf_weight_and_cosine_score(self, scores, query_keyword_inv_ind, query_doc_frequency):
         for keyword in query_keyword_inv_ind:
             query_tf_idf_weight = math.log(query_doc_frequency[keyword] + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
             for doc_id, frequency in query_keyword_inv_ind[keyword]["doc-ids"]:
                 if doc_id not in scores:
                     scores[doc_id] = 0.0 # as a temp value, just to create the entry in the dictionary
-                    docs_ids.append(doc_id)
+                    self.docs_ids.append(doc_id)
                 document_tf_idf_weight = math.log(frequency + 1, 10) * query_keyword_inv_ind[keyword]["IDF"]
                 
                 scores[doc_id] += query_tf_idf_weight * document_tf_idf_weight
 
 
-    def score_normalization(self, docs_ids, scores):
+    def score_normalization(self, scores):
         query_norms = {}
         try:
+            if not os.path.exists(cwd + "/documents/norm_doc"):
+                os.makedirs(cwd + "/documents/norm_doc")
             with open(norm_doc_path, 'r', encoding="utf-8") as norm_doc:
+                self.accesos_a_norm_doc_for_normalization += 1
                 for line in norm_doc:
                     json_object = json.load(io.StringIO(line))
                     key = list(json_object.keys())
-                    if key[0] in docs_ids:
+                    if key[0] in self.docs_ids:
                         query_norms[key[0]] = json_object.get(key[0])
                 norm_doc.close()
             for doc_id in scores:
@@ -449,6 +510,7 @@ class UBetterFixEverything():
     def get_documents(self, scores, documents_retrieved, docs_to_read):
         try:
             with open(data_path, 'r', encoding="utf-8") as datafile:
+                self.accesos_disco_data += 1
                 counter = 0
                 for document in datafile:
                     json_object = json.load(io.StringIO(document))
@@ -473,7 +535,6 @@ class UBetterFixEverything():
         # some variables
         query_doc_frequency = {}
         query_keyword_inv_ind = {}
-        docs_ids = []
         scores = {} # {doc_id: score}
         documents_retrieved = {}
 
@@ -489,14 +550,14 @@ class UBetterFixEverything():
         self.binary_search(query_doc_frequency, query_keyword_inv_ind) # we get all posting lisit from keyword in query into query_keywords_inverted_index
 
         print("Calculando pesos TF_IDF y Cosine Score.")
-        self.tf_idf_weight_and_cosine_score(docs_ids, scores, query_keyword_inv_ind, query_doc_frequency)
+        self.tf_idf_weight_and_cosine_score(scores, query_keyword_inv_ind, query_doc_frequency)
 
         print("Normalizando vectores.")
-        self.score_normalization(docs_ids, scores)
+        self.score_normalization(scores)
  
         print("Ordenando scores.")
         scores = dict(sorted(scores.items(), key=lambda item: item[1], reverse = True)) # order the scores in descending order
-        docs_ids = list(scores.keys())
+        self.docs_ids = list(scores.keys())
 
         # for i in range(10):
         #     print("scores[" + str(docs_ids[i]) + "] -> " + str(scores[docs_ids[i]]))
@@ -506,50 +567,290 @@ class UBetterFixEverything():
 
         print("El query ha retornado un total de " + str(len(documents_retrieved)) + " documentos")
         
-        return self.retrieve(k, docs_ids, scores, documents_retrieved)
+        return k, scores, documents_retrieved
 
-    def retrieve(self, k, docs_ids, scores, documents_retrieved):
+    def retrieve(self, k, scores, documents_retrieved):
         k = int(k) # parsing, bc we receive strings from the frontend
         documents_to_retrieve = []
 
         for i in range(k):
-            if i < len(docs_ids):
+            if i < len(self.docs_ids):
                 temp_doc = {}
-                temp_doc["id"] = docs_ids[i]
-                temp_doc["score"] = scores[docs_ids[i]]
-                temp_doc["submitter"] = documents_retrieved[docs_ids[i]].get("submitter")
-                temp_doc["authors"] = documents_retrieved[docs_ids[i]].get("authors")
-                temp_doc["title"] = documents_retrieved[docs_ids[i]].get("title")
-                temp_doc["comments"] = documents_retrieved[docs_ids[i]].get("comments")
-                temp_doc["journal-ref"] = documents_retrieved[docs_ids[i]].get("journal-ref")
-                temp_doc["doi"] = documents_retrieved[docs_ids[i]].get("doi")
-                temp_doc["report-no"] = documents_retrieved[docs_ids[i]].get("report-no")
-                temp_doc["categories"] = documents_retrieved[docs_ids[i]].get("categories")
-                temp_doc["license"] = documents_retrieved[docs_ids[i]].get("license")
-                temp_doc["abstract"] = documents_retrieved[docs_ids[i]].get("abstract")
-                temp_doc["versions"] = documents_retrieved[docs_ids[i]].get("versions")
-                temp_doc["update_date"] = documents_retrieved[docs_ids[i]].get("update_date")
-                temp_doc["authors_parsed"] = documents_retrieved[docs_ids[i]].get("authors_parsed")
+                temp_doc["id"] = self.docs_ids[i]
+                temp_doc["score"] = scores[self.docs_ids[i]]
+                temp_doc["submitter"] = documents_retrieved[self.docs_ids[i]].get("submitter")
+                temp_doc["authors"] = documents_retrieved[self.docs_ids[i]].get("authors")
+                temp_doc["title"] = documents_retrieved[self.docs_ids[i]].get("title")
+                temp_doc["comments"] = documents_retrieved[self.docs_ids[i]].get("comments")
+                temp_doc["journal-ref"] = documents_retrieved[self.docs_ids[i]].get("journal-ref")
+                temp_doc["doi"] = documents_retrieved[self.docs_ids[i]].get("doi")
+                temp_doc["report-no"] = documents_retrieved[self.docs_ids[i]].get("report-no")
+                temp_doc["categories"] = documents_retrieved[self.docs_ids[i]].get("categories")
+                temp_doc["license"] = documents_retrieved[self.docs_ids[i]].get("license")
+                temp_doc["abstract"] = documents_retrieved[self.docs_ids[i]].get("abstract")
+                temp_doc["versions"] = documents_retrieved[self.docs_ids[i]].get("versions")
+                temp_doc["update_date"] = documents_retrieved[self.docs_ids[i]].get("update_date")
+                temp_doc["authors_parsed"] = documents_retrieved[self.docs_ids[i]].get("authors_parsed")
                 documents_to_retrieve.append(temp_doc)
             else:
                 break
-
+        
         return documents_to_retrieve
 
 
-def main():
+
+
+# --------------------- MAIN AND MENU -------------------------
+
+from pick import pick
+
+def menu():
     docs_to_read = 1000
-    instance = UBetterFixEverything()
+    c = "Yes"
+    query = ""
+    k = 10
+    title = 'There are more than a million documents in the dataset, how many would you like to load? '
+    options = ['1000', '5000', '20000', '50000', '100000', '500000', '1000000', 'All of them!?!?!', 'Write a number']
+    docs_to_read, index = pick(options, title, indicator='=>', default_index=2)
+    index = int(index)
+    if index < 7:
+        docs_to_read = int(docs_to_read)
+    else:
+        if index == 7:
+            docs_to_read = 9999999 # like an inf number, so it will stop when it is finished
+        elif index == 8:
+            docs_to_read = input("Choose a number of documents to load: ")
+            docs_to_read = int(docs_to_read)
+
+    flag = True
+    while flag:
+        title = 'Do you want to clear the existing directories? '
+        options = ['Yes', 'No', 'Show me the directories']
+        option, index = pick(options, title, indicator='=>', default_index=2)
+        if option == "Yes" or option == "No":
+            flag = False
+            c = option
+        else:
+            print("Implementation in progress.")
+            # show_directories()
+    
+    title = 'Insert the query: '
+    options = ['default query 1', 'default query 2', 'Write query']
+    option, index = pick(options, title, indicator='=>', default_index=2)
+    if option == 'default query 1':
+        query = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
+    elif option == 'default query 2':
+        query = "We systematically explore the evolution of the merger of two carbon-oxygen\n(CO) white dwarfs. The dynamical evolution of a 0.9 Msun + 0.6 Msun CO white\ndwarf merger is followed by a three-dimensional SPH simulation. We use an\nelaborate prescription in which artificial viscosity is essentially absent,\nunless a shock is detected, and a much larger number of SPH particles than\nearlier calculations. Based on this simulation, we suggest that the central\nregion of the merger remnant can, once it has reached quasi-static equilibrium,\nbe approximated as a differentially rotating CO star, which consists of a\nslowly rotating cold core and a rapidly rotating hot envelope surrounded by a\ncentrifugally supported disc. We construct a model of the CO remnant that\nmimics the results of the SPH simulation using a one-dimensional hydrodynamic\nstellar evolution code and then follow its secular evolution. The stellar\nevolution models indicate that the growth of the cold core is controlled by\nneutrino cooling at the interface between the core and the hot envelope, and\nthat carbon ignition in the envelope can be avoided despite high effective\naccretion rates. This result suggests that the assumption of forced accretion\nof cold matter that was adopted in previous studies of the evolution of double\nCO white dwarf merger remnants may not be appropriate. Our results imply that\nat least some products of double CO white dwarfs merger may be considered good\ncandidates for the progenitors of Type Ia supernovae. In this case, the\ncharacteristic time delay between the initial dynamical merger and the eventual\nexplosion would be ~10^5 yr. (Abridged)."
+    else:
+        query = input("Insert query: ")
+
+
+    title = 'How many documents you want to retrieve? '
+    options = ['10', '20', '30', 'Write a number']
+    option, index = pick(options, title, indicator='=>', default_index=2)
+    if option == 'Write a number':
+        k = input("Choose a number of documents to retrieve: ")
+    else:
+        k = int(option)
+    
+    return int(docs_to_read), c, query, int(k)
+
+
+def search(instance, docs_to_read, c, query, k):
+    # docs_to_read, c, query, k = menu()
+
+
+    time1 = time.time()
+    k, scores, documents_retrieved = instance.score(query, docs_to_read, k)
+    time2 = time.time()
+    tiempo_f1 = str(round((time2 - time1) * 1000))
+    print("Query processing, score similarity and fetching similar documents took " + tiempo_f1 + " ms.")
+
+    time1 = time.time()
+    docs = instance.retrieve(k, scores, documents_retrieved)
+    time2 = time.time()
+    tiempo_f2 = str(round((time2 - time1) * 1000))
+    print("Retrieving only the k documents took " + tiempo_f2 + " ms.")
+
+    accesos = instance.get_disk_accesses()
+    print("se accedio a disco un total de: " + str(accesos))
+
+    return docs, str(int(tiempo_f1) + int(tiempo_f2))
+
+def load_data(instance, docs_to_read):
+    
+    aprox_bloques_por_crear, aprox_block_size = instance.approximation(docs_to_read)   
+    instance.BLOCK_SIZE = instance.MB_to_B(aprox_block_size*2) # to reduce the scale according to the approximation from the file size
+
+    print(instance.BLOCK_SIZE)
+
+    time1 = time.time()
     instance.load(docs_to_read) 
-    query_1 = "A fully differential calculation in perturbative quantum chromodynamics is presented for the production of massive photon pairs at hadron colliders. All next-to-leading order perturbative contributions from quark-antiquark, gluon-(anti)quark, and gluon-gluon subprocesses are included, as well as all-orders resummation of initial-state gluon radiation valid at next-to-next-to-leading logarithmic accuracy. The region of phase space is specified in which the calculation is most reliable. Good agreement is demonstrated with data from the Fermilab Tevatron, and predictions are made for more detailed tests with CDF and DO data. Predictions are shown for distributions of diphoton pairs produced at the energy of the Large Hadron Collider (LHC). Distributions of the diphoton pairs from the decay of a Higgs boson are contrasted with those produced from QCD processes at the LHC, showing that enhanced sensitivity to the signal can be obtained with judicious selection of events."
-    query_2 = "We systematically explore the evolution of the merger of two carbon-oxygen\n(CO) white dwarfs. The dynamical evolution of a 0.9 Msun + 0.6 Msun CO white\ndwarf merger is followed by a three-dimensional SPH simulation. We use an\nelaborate prescription in which artificial viscosity is essentially absent,\nunless a shock is detected, and a much larger number of SPH particles than\nearlier calculations. Based on this simulation, we suggest that the central\nregion of the merger remnant can, once it has reached quasi-static equilibrium,\nbe approximated as a differentially rotating CO star, which consists of a\nslowly rotating cold core and a rapidly rotating hot envelope surrounded by a\ncentrifugally supported disc. We construct a model of the CO remnant that\nmimics the results of the SPH simulation using a one-dimensional hydrodynamic\nstellar evolution code and then follow its secular evolution. The stellar\nevolution models indicate that the growth of the cold core is controlled by\nneutrino cooling at the interface between the core and the hot envelope, and\nthat carbon ignition in the envelope can be avoided despite high effective\naccretion rates. This result suggests that the assumption of forced accretion\nof cold matter that was adopted in previous studies of the evolution of double\nCO white dwarf merger remnants may not be appropriate. Our results imply that\nat least some products of double CO white dwarfs merger may be considered good\ncandidates for the progenitors of Type Ia supernovae. In this case, the\ncharacteristic time delay between the initial dynamical merger and the eventual\nexplosion would be ~10^5 yr. (Abridged)."
-    query_2 = query_2.rstrip("\n")
-    docs = instance.score(query_2, docs_to_read, 10)
+    time2 = time.time()
+    print("Document loading took " + str(round((time2 - time1) * 1000)) + " ms.")
 
-    for i in docs:
-        print(i)
+def load_data_in_postgres(docs_to_read):
+    try:
+        conn = psycopg2.connect("dbname=postgres user=postgres  password=harold123") # user and password may change depending on ur settings
+        
+        cur = conn.cursor()
+
+        postgres_insert_query = "DROP TABLE IF EXISTS json_to_pos CASCADE;"
+        cur.execute(postgres_insert_query)
+
+        postgres_insert_query = "SET enable_seqscan = off;"
+        cur.execute(postgres_insert_query)
+
+        # now we create the table and load the entries and implement the GIN index
+
+        cur.execute("CREATE TABLE IF NOT EXISTS json_to_pos(id_ TEXT , submitter TEXT, authors TEXT, title TEXT, comments_ TEXT, journal TEXT, doi TEXT, report_no TEXT, categories TEXT, license TEXT, abstract TEXT, versions TEXT, update_date TEXT, authors_parsed TEXT);")
+        counter = 0
+        with open(data_path, 'r') as file:
+            for line in file: # a line is a document
+                line = line.rstrip()
+                doc_object = json.load(io.StringIO(line)) # load the json object
+
+                doc_id          = str(doc_object.get("id"))
+                doc_submitter   = str(doc_object.get("submitter"))
+                doc_authors     = str(doc_object.get("authors"))
+                doc_title       = str(doc_object.get("title"))
+                doc_comments    = str(doc_object.get("comments"))
+                doc_journal     = str(doc_object.get("journal"))
+                doc_doi         = str(doc_object.get("doi"))
+                doc_report_no   = str(doc_object.get("report-no"))
+                doc_categories  = str(doc_object.get("categories"))
+                doc_license     = str(doc_object.get("license"))
+                doc_abstract    = str(doc_object.get("abstract"))
+                doc_versions    = str(doc_object.get("versions"))
+                doc_update_date = str(doc_object.get("update_date"))
+                doc_authors_par = str(doc_object.get("authors_parsed"))
+
+                postgres_insert_query = "INSERT INTO json_to_pos (id_, submitter, authors, title, comments_, journal, doi, report_no, categories, license, abstract, versions, update_date, authors_parsed) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);"
+                record_to_insert = (doc_id, doc_submitter, doc_authors, doc_title, doc_comments, doc_journal, doc_doi, doc_report_no, doc_categories, doc_license, doc_abstract, doc_versions, doc_update_date, doc_authors_par)
+                cur.execute(postgres_insert_query, record_to_insert)
+
+                counter += 1
+                if counter >= docs_to_read:
+                    break
+
+            file.close()
+
+        # now the gin index
+
+        # -- crear una nueva columna
+        cur.execute("alter table json_to_pos add column search_txt tsvector;")
+
+        # -- crear los vectores de terminos para el par: title, description
+        cur.execute("update json_to_pos set search_txt = R.weight from (select id_, setweight(to_tsvector('english', abstract), 'A') as weight from json_to_pos) R where R.id_ = json_to_pos.id_;")
+
+        # -- crear el indice
+        cur.execute("create index json_idx_search on json_to_pos using GIN (search_txt);")
 
 
-main()
+        conn.commit()
+        cur.close()
+        conn.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+            print('Database connection closed.')
 
 
+def postgres_search(query, k):
+    # process query
+    query = query.replace(" ", " or ")
+    documents_to_retrieve = []
+
+    try:
+        conn = psycopg2.connect("dbname=postgres user=postgres  password=harold123") # user and password may change depending on ur settings
+        
+        cur = conn.cursor()
+
+        postgres_insert_query = "select id_,title, ts_rank_cd(search_txt, query) as score from json_to_pos, websearch_to_tsquery('english', %s) query where query @@ search_txt order by  score desc limit %s;"
+        record_to_insert = (query, str(k))
+        cur.execute(postgres_insert_query, record_to_insert)
+
+        list_of_tuples = cur.fetchall()
+
+        postgres_insert_query = "explain analyze select id_,title, ts_rank_cd(search_txt, query) as score from json_to_pos, websearch_to_tsquery('english', %s) query where query @@ search_txt order by  score desc limit %s;"
+        record_to_insert = (query, str(k))
+        cur.execute(cur.mogrify(postgres_insert_query, record_to_insert))
+
+        analyzed_fetched = cur.fetchall()
+
+        execution_time1 = analyzed_fetched[-1]
+        planning_time1 = analyzed_fetched[-2]
+
+        execution_time = execution_time1[0].replace("Execution Time: ", "")
+        execution_time = execution_time.replace(" ms", "")
+
+        print()
+        print(execution_time)
+        print()
+
+
+        for tup in list_of_tuples:
+            temp_doc = {}
+            temp_doc["id"]      = tup[0]
+            temp_doc["title"]   = tup[1]
+            temp_doc["score"]   = tup[2]
+            documents_to_retrieve.append(temp_doc)
+
+
+
+        conn.commit()
+        cur.close()
+        conn.close()
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+    finally:
+        if conn is not None:
+            conn.close()
+            print('Database connection closed.')
+            return documents_to_retrieve, execution_time
+
+
+
+app = Flask(__name__)
+
+
+
+@app.route("/", methods=["GET", "POST"])
+def index():
+    if request.method == 'POST':
+        docs_to_read = request.form['docs_to_read']
+
+        load_data(instance, int(docs_to_read))
+        load_data_in_postgres(int(docs_to_read))
+
+        return redirect(url_for('data_cargada', docs_to_read=docs_to_read, c=c))
+    return render_template('cargar_data.html')
+
+
+@app.route("/<docs_to_read>/<c>", methods=["GET", "POST"])
+def data_cargada(docs_to_read, c):
+    if request.method == 'POST':
+        if request.form.get('action1') == 'value1':
+            print("Se cargaran",docs_to_read,"datos")
+
+            query = request.form['query']
+            k = request.form['topk']
+
+            resultado, time = search(instance, int(docs_to_read), c, query, int(k))
+
+            postgres_resultado, execution_time = postgres_search(query, k)
+
+            return render_template("index.html",resultado=resultado, postgres_resultado=postgres_resultado, python_time = time, postgres_time = execution_time)
+        elif  request.form.get('action2') == 'value2':
+            instance.clean_directories()
+            return redirect(url_for('index'))
+    return render_template('index.html')
+
+
+
+if __name__ == '__main__':
+    c = "Yes"
+    instance = UBetterFixEverything(c)
+    app.run(debug=True)
